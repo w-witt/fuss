@@ -1,0 +1,274 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: #ece8dd;          /* warm paper backdrop */
+    --bg-bar: #f7f4ec;
+    --text: #3a352c;
+    --text-muted: #8a8273;
+    --accent: #9a5b2d;
+    --border: #d8d1c0;
+    --highlight: rgba(255, 196, 0, 0.45);
+    --page-shadow: 0 2px 12px rgba(60, 50, 30, 0.18);
+}
+
+html, body {
+    height: 100%;
+    font-family: 'Georgia', 'Iowan Old Style', 'Palatino', serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Top bar */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1.5rem;
+    background: var(--bg-bar);
+    border-bottom: 1px solid var(--border);
+    height: 48px;
+    flex-shrink: 0;
+}
+
+.logo {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+}
+
+.upload-btn {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.upload-btn:hover {
+    background: var(--border);
+    color: var(--text);
+}
+
+/* Document viewport — the e-reader page area */
+.pdf-viewport {
+    flex: 1;
+    position: relative;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 2rem 1rem;
+}
+
+.pdf-page {
+    position: relative;
+    max-width: 100%;
+    box-shadow: var(--page-shadow);
+    border-radius: 2px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.pdf-page canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 2px;
+}
+
+/* Invisible pdf.js text layer, kept only for measuring word positions */
+.textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.textLayer span,
+.textLayer br {
+    position: absolute;
+    white-space: pre;
+    transform-origin: 0 0;
+}
+
+/* The word being read aloud */
+.word-highlight {
+    position: absolute;
+    display: none;
+    background: var(--highlight);
+    border-radius: 3px;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    transition: left 0.12s ease-out, top 0.12s ease-out, width 0.12s ease-out, height 0.12s ease-out;
+}
+
+.loading-text {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 3rem;
+    font-style: italic;
+}
+
+/* Audio bar */
+.audio-bar {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.5rem 1.5rem;
+    background: var(--bg-bar);
+    border-top: 1px solid var(--border);
+    height: 64px;
+    flex-shrink: 0;
+}
+
+.audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.audio-controls button {
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: 0.3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.audio-controls button:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.play-btn {
+    width: 44px;
+    height: 44px;
+    background: var(--accent) !important;
+    color: #fff !important;
+    border-radius: 50%;
+}
+
+.play-btn:hover {
+    opacity: 0.9;
+}
+
+.progress-section {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#progress-bar {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+#progress-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#time-current, #time-total {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    min-width: 3em;
+    font-variant-numeric: tabular-nums;
+}
+
+.speed-section {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.speed-section label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+#speed-select {
+    background: var(--bg-bar);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+/* Page navigation */
+.page-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.2rem 0.6rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.page-nav button:hover {
+    background: var(--border);
+}
+
+#pdf-page-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar styling */
+.pdf-viewport::-webkit-scrollbar {
+    width: 10px;
+}
+
+.pdf-viewport::-webkit-scrollbar-track {
+    background: var(--bg);
+}
+
+.pdf-viewport::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 5px;
+}
+
+.pdf-viewport::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}

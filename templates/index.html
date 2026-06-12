@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuss</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --bg-panel: #16213e;
+            --bg-bar: #0f3460;
+            --text: #e0e0e0;
+            --text-muted: #8899aa;
+            --accent: #e94560;
+            --border: #2a2a4a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 520px;
+            width: 100%;
+            padding: 2.5rem;
+            background: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            color: var(--accent);
+            text-align: center;
+            margin-bottom: 0.3rem;
+            font-size: 1.8rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            align-items: center;
+        }
+
+        .drop-zone {
+            width: 100%;
+            padding: 2.5rem 1.5rem;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background 0.3s;
+            position: relative;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(233, 69, 96, 0.05);
+        }
+
+        .drop-zone input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .drop-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .drop-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .file-name {
+            color: var(--accent);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .submit-btn {
+            background: var(--accent);
+            color: #fff;
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: opacity 0.2s;
+            width: 100%;
+        }
+
+        .submit-btn:hover { opacity: 0.9; }
+        .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 0.75rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-msg {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .note {
+            margin-top: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fuss</h1>
+        <p class="subtitle">Listen to academic papers read aloud</p>
+
+        <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data"
+              onsubmit="showLoading()">
+            <div class="drop-zone" id="drop-zone">
+                <input type="file" name="file" accept=".pdf" required
+                       onchange="fileSelected(this)">
+                <div class="drop-icon">&#128196;</div>
+                <div class="drop-text">Drop a PDF here or click to browse</div>
+                <div class="file-name" id="file-name"></div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submit-btn" disabled>
+                Convert &amp; Read
+            </button>
+
+            <div id="loading">
+                <div class="spinner"></div>
+                <p class="loading-msg">Processing your PDF... This may take a few minutes for longer papers.</p>
+            </div>
+        </form>
+
+        <p class="note">Supports academic PDFs up to 50 MB. Math notation will be read aloud.</p>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', () => dropZone.classList.remove('dragover'));
+
+        function fileSelected(input) {
+            const name = input.files[0]?.name || '';
+            const el = document.getElementById('file-name');
+            el.textContent = name;
+            el.style.display = name ? 'block' : 'none';
+            document.getElementById('submit-btn').disabled = !name;
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('submit-btn').disabled = true;
+        }
+    </script>
+</body>
+</html>

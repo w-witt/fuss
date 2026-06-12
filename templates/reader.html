@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuss Reader</title>
+    <link rel="stylesheet" href="/static/css/reader.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+</head>
+<body>
+    <header class="top-bar">
+        <a href="/" class="logo">Fuss</a>
+        <a href="/" class="upload-btn">Upload New</a>
+    </header>
+
+    <div class="pdf-viewport" id="pdf-viewport">
+        <p class="loading-text">Loading document&hellip;</p>
+    </div>
+
+    <div class="audio-bar" id="audio-bar">
+        <div class="audio-controls">
+            <button id="btn-prev-seg" title="Previous segment">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button id="btn-play" class="play-btn" title="Play/Pause">
+                <svg id="icon-play" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="icon-pause" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <button id="btn-next-seg" title="Next segment">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+        </div>
+
+        <div class="progress-section">
+            <span id="time-current">0:00</span>
+            <input type="range" id="progress-bar" min="0" max="100" value="0" step="0.1">
+            <span id="time-total">0:00</span>
+        </div>
+
+        <div class="speed-section">
+            <label for="speed-select">Speed:</label>
+            <select id="speed-select">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="1.75">1.75x</option>
+                <option value="2">2x</option>
+            </select>
+        </div>
+
+        <div class="page-nav">
+            <button id="pdf-prev" title="Previous page">&larr;</button>
+            <span id="pdf-page-info">Page 1 / 1</span>
+            <button id="pdf-next" title="Next page">&rarr;</button>
+        </div>
+    </div>
+
+    <audio id="audio-element" preload="auto"></audio>
+
+    <script>
+        // Pass job_id to JavaScript
+        window.FUSS = {
+            jobId: "{{ job_id }}",
+        };
+    </script>
+    <script src="/static/js/sync.js"></script>
+    <script src="/static/js/aligner.js"></script>
+    <script src="/static/js/pdf-viewer.js"></script>
+    <script src="/static/js/audio-player.js"></script>
+    <script src="/static/js/reader.js"></script>
+</body>
+</html>

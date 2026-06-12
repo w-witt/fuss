@@ -1,0 +1,228 @@
+text_replacements = [
+    (r"i\.e\.", 'that is'),
+    (r"e\.g\.", 'for example'),
+    (r"e\. g\.", 'for example'),
+    (r"i\.i\.d\.", 'i i d'),
+    (r"Eq\.", 'Equation'),
+    (r"eq\.", 'equation'),
+    (r"Fig\.", 'Figure'),
+    (r"fig\.", 'figure'),
+    (r"Sec\.", 'Section'),
+    (r"sec\.", 'section'),
+    (r"Tab\.", 'Table'),
+    (r"tab\.", 'table'),
+    (r"Thm\.", 'Theorem'),
+    (r"thm\.", 'theorem'),
+    (r"vs\.", 'versus'),
+    (r"w\.r\.t\.", 'with respect to'),
+    (r"w\.r\.t", 'with respect to'),
+    (r"w\.l\.o\.g\.", 'without loss of generality'),
+    (r"\((.*?)\)-th", r"\1-th"),
+    # remove numbers after sentences, e.g. ... of training.4
+    (r'(\w+)\.(\d+)$', r'\1'),
+    # add break after title number
+    (r'#+\s+(\d+(\.\d+)*)\s+', r'<s>\1</s>'),
+    (r' et al.', ' et al'),
+    # remove ssml closing tags
+    (r'<break time="0.5s"></break>', r'<break time="0.5s"/>'),
+    # remove references: [1], [1, 2], [14] etc. but NOT (0), (1) which may be math
+    (r'\s*\[[0-9,-, ]+(, pp\. [0-9,-]+|, p\.\d+[f]?[f]?\.?)?\]', ''),
+    (r'\s*\([0-9]+(?:[,-, ]+[0-9]+)+(, pp\. [0-9,-]+|, p\.\d+[f]?[f]?\.?)?\)', ''),
+    (r'\s*\[[^\]]*, \d{4}(?:, [^\]]*, \d{4})*\]', ''),
+    (r'\s*\([^\)]*, \d{4}(?:[;,] [^\)]*, \d{4}[a-zA-Z]*?)*\)', ''),
+    (r'\s*(\b\w+\s+et al\.) (\[\d{4}\]|\(\d{4}\))', r'\1'),
+    # remove urls
+    (r'\s*https?://[\w/:%#\$&\?\(\)~\.=\+\-]*[\w\d_\-]', ''),
+    # remove new lines
+    (r'\n', ''),
+]
+
+math_replacements = [
+    # combined symbols
+    (r'\\lVert\\cdot\\rVert', 'norm'),
+
+    # Fractions, powers, exponents (BEFORE arithmetic so ^{-1} isn't mangled by - → minus)
+    (r'\^\{-1\}', ' inverse'),
+    (r'\^\{-1}', ' inverse'),
+    (r'\^{-1}', ' inverse'),
+    (r'\^\{\\circ\}', 'degrees'),
+    (r'\^\{2\}', ' squared'),
+    (r'\^2', ' squared'),
+    (r'\^\{3\}', ' cubed'),
+    (r'\^3', ' cubed'),
+    (r'\^\{T\}', ' transpose'),
+    (r'\^\{\\prime\}', ' prime'),
+    (r'\^\{\*\}', ' star'),
+    (r'\^\{n\}', ' to the n'),
+    (r'\^\{[+]\}', ' '),
+    (r'\^\{([^}]+)\}', r' to the \1'),
+    (r'\\[td]?frac{([^}]+)}{([^}]+)}', r'\1 over \2'),
+    (r'\\[td]?frac', ' over '),
+
+    # Basic arithmetic operations
+    (r'\+', 'plus'),
+    (r'-', 'minus'),
+    (r'\*', 'multiplied by'),
+    (r'/', 'divided by'),
+
+    # Roots
+    (r'\\sqrt{([^}]+)}', 'square root of \1'),
+    (r'\\sqrt\[3]{([^}]+)}', 'cube root of \1'),
+    (r'\\sqrt\[(\d+)]{([^}]+)}', r'\1-th root of \2'),
+
+    # Logarithmic and exponential functions
+    (r'\\ln', 'natural log of'),
+    (r'\\log', 'log of'),
+    (r'\\exp', 'e to the'),
+
+    # Modular arithmetic
+    (r'\\pmod\{([^}]+)}', r'mod \1'),
+    (r'\\bmod', 'mod'),
+    (r'\\mod', 'mod'),
+    (r'\\equiv', 'is congruent to'),
+
+    # Calculus symbols
+    (r'\\int', 'integral'),
+    (r'\\prod', 'product over'),
+    (r'\\sum', 'summation over'),
+    (r'\\lim', 'limit'),
+    (r'\\infty', 'infinity'),
+
+    # Basic mathematical symbols
+    (r'\\pm', 'plus or minus'),
+    (r'\\times', 'times'),
+    (r'\\div', 'divided by'),
+    (r'\\cdot', 'times'),
+    (r'\\leq', 'less than or equal to'),
+    (r'\\geq', 'greater than or equal to'),
+    (r'>', 'greater'),
+    (r'<', 'less than'),
+    (r'\\neq', 'not equal to'),
+    (r'\\approx', 'approximately'),
+
+    # Relations
+    (r'\\sim', 'distributed as'),
+    (r'\\propto', 'proportional to'),
+    (r'\\odot', 'element-wise'),
+    (r'\\otimes', 'tensor product'),
+    (r'\\oplus', 'direct sum'),
+
+    # Quantifiers and logic symbols
+    (r'\\forall', 'for all'),
+    (r'\\ni', 'such that'),
+    (r'\\exists', 'there exists'),
+    (r'\\leftarrow', 'gets'),
+    (r'\\gets', 'gets'),
+    (r'\\rightarrow', 'goes to'),
+    (r'\\Rightarrow', 'implies'),
+    (r'\\Leftarrow', 'is implied by'),
+    (r'\\Leftrightarrow', 'if and only if'),
+    (r'\\mapsto', 'maps to'),
+    (r'\\to', 'to'),
+    (r'\\in', 'in'),
+
+    # Greek letters (capitals first — longer names match before shorter)
+    (r'\\Gamma', 'Gamma'),
+    (r'\\Delta', 'Delta'),
+    (r'\\Theta', 'Theta'),
+    (r'\\Lambda', 'Lambda'),
+    (r'\\Sigma', 'Sigma'),
+    (r'\\Phi', 'Phi'),
+    (r'\\Psi', 'Psi'),
+    (r'\\Omega', 'Omega'),
+    (r'\\alpha', 'alpha'),
+    (r'\\beta', 'beta'),
+    (r'\\gamma', 'gamma'),
+    (r'\\delta', 'delta'),
+    (r'\\epsilon', 'epsilon'),
+    (r'\\zeta', 'zeta'),
+    (r'\\eta', 'eta'),
+    (r'\\theta', 'theta'),
+    (r'\\iota', 'iota'),
+    (r'\\kappa', 'kappa'),
+    (r'\\lambda', 'lambda'),
+    (r'\\mu', 'mu'),
+    (r'\\nu', 'nu'),
+    (r'\\xi', 'ksi'),
+    (r'\\pi', 'pi'),
+    (r'\\rho', 'rho'),
+    (r'\\sigma', 'sigma'),
+    (r'\\tau', 'tau'),
+    (r'\\upsilon', 'upsilon'),
+    (r'\\phi', 'phi'),
+
+    # Trigonometric functions
+    (r'\\sin', 'sine'),
+    (r'\\cos', 'cosine'),
+    (r'\\tan', 'tangent'),
+    (r'\\cot', 'cotangent'),
+    (r'\\arcsin', 'arcsine'),
+    (r'\\arccos', 'arccosine'),
+    (r'\\arctan', 'arctangent'),
+
+    # Set notation
+    (r'\\emptyset', 'empty set'),
+    (r'\\subseteq', 'is a subset of or equal to'),
+    (r'\\superset', 'superset'),
+    (r'\\cup', 'union'),
+    (r'\\cap', 'intersection'),
+    (r'\\notin', 'is not an element of'),
+    (r'\\subset', 'subset'),
+    (r'\\setminus', 'set minus'),
+    (r'\\operatorname\{supp}', 'support of'),
+
+    # Other symbols
+    (r'\\mathbb\{E}', 'expectation'),
+    (r'\\hat\{([^}]+)}', r'\1 hat'),
+    (r'\\bar\{([^}]+)}', r'\1 bar'),
+    (r'\\tilde\{([^}]+)}', r'\1 tilde'),
+    (r'\\dot\{([^}]+)}', r'\1 dot'),
+    (r'\\ddot\{([^}]+)}', r'\1 double dot'),
+    (r'\\mathcal\{([^}]+)}', r'\1'),
+    (r'\\mathbb\{([^}]+)}', r'\1'),
+    (r'\\mathbf\{([^}]+)}', r'\1'),
+    (r'\\mathcal\{([^}]+)}', r'\1'),
+    (r'\\lVert', 'norm of'),
+    (r'\\rVert', ''),
+    (r'\\langle', ''),
+    (r'\\rangle', ''),
+    (r'\\dots', ''),
+    (r'\\ldots', ''),
+    (r'\\mid', ''),
+
+    # Calculus and vector notation
+    (r'\\nabla', 'gradient of'),
+    (r'\\partial', 'partial'),
+    (r'\\operatorname\{([^}]+)}', r'\1'),
+
+    # Display math formatting
+    (r'\\text\{([^}]*)}', r'\1'),
+    (r'\\textrm\{([^}]*)}', r'\1'),
+    (r'\\mathrm\{([^}]*)}', r'\1'),
+    (r'\\tag\{[^}]*}', ''),
+    (r'\\tag\s*\d+', ''),
+    (r'\\boxed\{([^}]*)}', r'\1'),
+    (r'\\quad', ' '),
+    (r'\\qquad', ' '),
+    (r'\\,', ' '),
+    (r'\\;', ' '),
+    (r'\\!', ''),
+    (r'\\begin\{[^}]*}', ''),
+    (r'\\end\{[^}]*}', ''),
+    (r'\\underbrace\{([^}]*)}', r'\1'),
+    (r'\\overbrace\{([^}]*)}', r'\1'),
+    (r'\\overline\{([^}]*)}', r'\1 bar'),
+
+    # Removing unnecessary LaTeX commands
+    (r'\\[Bb]ig[gl]?', ''),
+    (r'\\[Bb]ig[gr]?', ''),
+    (r'\\boldsymbol', ''),
+    (r'\\left(?!arrow)', ''),
+    (r'\\right(?!arrow)', ''),
+    (r'\^', ''),
+    (r'\|', ''),
+    (r'\\', ''),
+    (r'_', ''),
+    (r'{', ''),
+    (r'}', ''),
+]
