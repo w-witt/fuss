@@ -88,4 +88,5 @@ def api_sync_map(job_id):
 if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    app.run(debug=True, port=5000)
+    # Port 5050: macOS AirPlay Receiver squats on 5000
+    app.run(debug=True, port=5050)

@@ -29,7 +29,7 @@ Run the web application:
 python app.py
 ```
 
-Then open your browser and navigate to `http://localhost:5000`
+Then open your browser and navigate to `http://localhost:5050`
 
 ### Command Line Interface
 
