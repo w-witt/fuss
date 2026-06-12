@@ -46,3 +46,7 @@ python cli.py --input path/to/your/file.pdf --output output.tex
 - Click any word on the page to start reading from it
 - Playback speed control, segment skipping, keyboard shortcuts
 - Command-line interface for batch processing
+
+## License
+
+Fuss is licensed under the [GNU General Public License v3.0](LICENSE). Parts of the text processing pipeline are adapted from [paper2speech](https://github.com/kaieberl/paper2speech) (GPL-3.0).
