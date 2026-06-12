@@ -11,6 +11,9 @@
     await Sync.loadSyncMap(jobId);
     await PdfViewer.load(`/api/pdf/${jobId}`);
 
+    // Segment source texts, used as context in feedback reports
+    const segments = await (await fetch(`/api/segments/${jobId}`)).json();
+
     // Align the spoken word stream to word boxes on the PDF
     const spokenWords = Sync.getWords();
     wordRects = Aligner.align(
@@ -71,9 +74,22 @@
         AudioPlayer.seekTo(Sync.getSegmentStartTime(target));
     });
 
+    // Beta feedback modal, fed with the current reading position
+    Feedback.init(() => {
+        const word = activeWordIndex >= 0 ? spokenWords[activeWordIndex] : null;
+        const segment = word ? segments.find(s => s.index === word.segment_index) : null;
+        return {
+            word: word ? word.text : null,
+            segment_text: segment ? segment.source_text : null,
+            time_ms: word ? word.start_time_ms : null,
+            page: word && wordRects[activeWordIndex] ? wordRects[activeWordIndex].page : null,
+        };
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if (Feedback.isOpen()) return;
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
         if (e.code === 'Space') {
             e.preventDefault();
             AudioPlayer.togglePlay();

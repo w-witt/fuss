@@ -63,6 +63,158 @@ body {
     color: var(--text);
 }
 
+.brand {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.beta-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--bg-bar);
+    background: var(--accent);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+}
+
+.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.feedback-btn {
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--accent);
+    background: none;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 0.3rem 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.feedback-btn:hover {
+    background: var(--accent);
+    color: var(--bg-bar);
+}
+
+/* Feedback modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(58, 53, 44, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal-overlay[hidden] {
+    display: none;
+}
+
+.modal {
+    width: min(560px, calc(100vw - 2rem));
+    background: var(--bg-bar);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--page-shadow);
+    padding: 1.5rem;
+}
+
+.modal h2 {
+    font-size: 1.15rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+}
+
+.modal-intro {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.modal-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0.8rem 0 0.3rem;
+}
+
+.modal select,
+.modal textarea {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.45rem 0.6rem;
+}
+
+.modal textarea {
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.feedback-context {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.6rem;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 1.2rem;
+}
+
+.modal-btn {
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s;
+}
+
+.modal-btn:hover {
+    background: var(--border);
+}
+
+.modal-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.modal-btn.primary:hover {
+    opacity: 0.9;
+    background: var(--accent);
+}
+
+.modal-status {
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-top: 0.6rem;
+    min-height: 1.2em;
+    text-align: right;
+}
+
 /* Document viewport — the e-reader page area */
 .pdf-viewport {
     flex: 1;

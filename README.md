@@ -47,6 +47,16 @@ python cli.py --input path/to/your/file.pdf --output output.tex
 - Playback speed control, segment skipping, keyboard shortcuts
 - Command-line interface for batch processing
 
+## Beta feedback
+
+How LaTeX commands become spoken text is built in the open — the dictionary lives in [pipeline/replacements.py](pipeline/replacements.py), and reports from readers drive it. The **Feedback** button in the reader captures what was being read (word, passage, page, timestamp) and lets you report:
+
+- LaTeX commands that were missed or read as gibberish
+- words or notation pronounced incorrectly
+- anything else
+
+Reports can be submitted in-app (stored in `feedback/feedback.jsonl` on the server) or opened directly as a prefilled [GitHub issue](https://github.com/w-witt/fuss/issues/new/choose).
+
 ## License
 
 Fuss is licensed under the [GNU General Public License v3.0](LICENSE). Parts of the text processing pipeline are adapted from [paper2speech](https://github.com/kaieberl/paper2speech) (GPL-3.0).

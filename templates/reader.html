@@ -9,8 +9,14 @@
 </head>
 <body>
     <header class="top-bar">
-        <a href="/" class="logo">Fuss</a>
-        <a href="/" class="upload-btn">Upload New</a>
+        <span class="brand">
+            <a href="/" class="logo">Fuss</a>
+            <span class="beta-badge">beta</span>
+        </span>
+        <span class="top-actions">
+            <button id="btn-feedback" class="feedback-btn">Feedback</button>
+            <a href="/" class="upload-btn">Upload New</a>
+        </span>
     </header>
 
     <div class="pdf-viewport" id="pdf-viewport">
@@ -59,16 +65,48 @@
 
     <audio id="audio-element" preload="auto"></audio>
 
+    <div class="modal-overlay" id="feedback-overlay" hidden>
+        <div class="modal" role="dialog" aria-labelledby="feedback-title">
+            <h2 id="feedback-title">Beta feedback</h2>
+            <p class="modal-intro">
+                Help improve how LaTeX is turned into speech. Reports about missed
+                commands and pronunciation go straight into the public dictionary work.
+            </p>
+
+            <label class="modal-label" for="feedback-category">What kind of issue?</label>
+            <select id="feedback-category">
+                <option value="missed-latex">A LaTeX command was missed / read as gibberish</option>
+                <option value="pronunciation">Something was pronounced incorrectly</option>
+                <option value="other">Other feedback</option>
+            </select>
+
+            <label class="modal-label" for="feedback-comment">What happened? What should it have said?</label>
+            <textarea id="feedback-comment" rows="4"
+                placeholder="e.g. \mathbb{R} was read as 'm a t h b b R' — it should say 'the real numbers'"></textarea>
+
+            <div class="feedback-context" id="feedback-context"></div>
+
+            <div class="modal-actions">
+                <button id="feedback-cancel" class="modal-btn">Cancel</button>
+                <a id="feedback-github" class="modal-btn" target="_blank" rel="noopener">Open GitHub issue</a>
+                <button id="feedback-submit" class="modal-btn primary">Submit</button>
+            </div>
+            <p class="modal-status" id="feedback-status"></p>
+        </div>
+    </div>
+
     <script>
         // Pass job_id to JavaScript
         window.FUSS = {
             jobId: "{{ job_id }}",
+            repoUrl: "{{ repo_url }}",
         };
     </script>
     <script src="/static/js/sync.js"></script>
     <script src="/static/js/aligner.js"></script>
     <script src="/static/js/pdf-viewer.js"></script>
     <script src="/static/js/audio-player.js"></script>
+    <script src="/static/js/feedback.js"></script>
     <script src="/static/js/reader.js"></script>
 </body>
 </html>

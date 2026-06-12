@@ -1,0 +1,21 @@
+name: Incorrect pronunciation
+description: A word, symbol, or expression was pronounced wrong
+labels: [beta-feedback, pronunciation]
+body:
+  - type: input
+    id: text
+    attributes:
+      label: Text that was mispronounced
+      placeholder: "Krylov"
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: How it should be pronounced
+      placeholder: "KRI-lof"
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: The passage it appeared in, or anything else useful

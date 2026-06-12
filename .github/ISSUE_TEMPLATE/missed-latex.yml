@@ -1,0 +1,29 @@
+name: Missed LaTeX command
+description: A LaTeX command was skipped or read as gibberish
+labels: [beta-feedback, missed-latex]
+body:
+  - type: input
+    id: command
+    attributes:
+      label: LaTeX command
+      description: The command or notation that was handled badly
+      placeholder: "\\mathbb{R}"
+    validations:
+      required: true
+  - type: input
+    id: heard
+    attributes:
+      label: What it said
+      placeholder: "m a t h b b R"
+  - type: input
+    id: expected
+    attributes:
+      label: What it should say
+      placeholder: "the real numbers"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: The passage it appeared in, paper title/link, or anything else useful

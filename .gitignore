@@ -8,3 +8,4 @@ output/
 # Local reference copy of kaieberl/paper2speech (GPL-3, not part of this repo)
 paper2speech/
 .claude/settings.local.json
+feedback/
