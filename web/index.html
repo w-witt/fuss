@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fuss — read academic papers, converted in your browser</title>
+    <meta
+      name="description"
+      content="Convert academic PDFs (math included) to plain readable text. Runs entirely on your own CPU/GPU in the browser — your PDF never leaves your machine."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./gate.js"></script>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>Fuss</h1>
+      <p class="tagline">Listen to math-heavy papers like an audiobook.</p>
+      <p class="lede">
+        Drop an academic PDF and Fuss reads it aloud — equations and all — with word-by-word
+        read-along. The Nougat model and the speech run on <strong>your own CPU/GPU</strong>; the
+        file never leaves your machine. <span class="beta-pill">Beta</span>
+      </p>
+      <p class="hero-links"><a href="#" data-about-open>Why “Fuss”?</a></p>
+    </header>
+
+    <main>
+      <section class="panel converter">
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" id="file-input" accept=".pdf" />
+          <div class="drop-icon">📄</div>
+          <div class="drop-text">Drop a PDF here or click to browse</div>
+          <div class="file-name" id="file-name"></div>
+        </div>
+
+        <div class="controls">
+          <button class="btn" id="convert-btn" disabled>Convert</button>
+          <span class="device-badge" id="device-badge" style="display: none"></span>
+        </div>
+
+        <div class="progress-wrap" id="progress" style="display: none">
+          <div class="progress-track">
+            <div
+              class="progress-bar"
+              id="progress-bar"
+              role="progressbar"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+            ></div>
+          </div>
+          <div class="progress-label" id="progress-label"></div>
+          <div class="progress-sub" id="progress-sub"></div>
+        </div>
+
+        <p class="note">
+          First run downloads the model (~one time, then cached). For best speed use a browser with
+          WebGPU (Chrome or Edge). Big or scanned PDFs take longer on CPU.
+        </p>
+      </section>
+
+      <section class="panel result" id="result" style="display: none">
+        <div class="reader-toolbar">
+          <button class="btn" id="play-btn">▶ Play</button>
+          <button class="btn btn-ghost icon-btn" id="prev-btn" title="Previous section">⏮</button>
+          <button class="btn btn-ghost icon-btn" id="next-btn" title="Next section">⏭</button>
+          <label class="ctl">
+            Speed
+            <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1" />
+            <span id="rate-val">1.0×</span>
+          </label>
+          <label class="ctl">
+            Voice
+            <select id="voice"></select>
+          </label>
+          <span class="reader-pos" id="reader-pos"></span>
+        </div>
+
+        <p class="voice-note" id="voice-note">
+          🔊 The voice comes from your browser/OS. This beta tests reading
+          <em>accuracy</em> (especially math) — not voice quality.
+        </p>
+
+        <div class="reader" id="reader" aria-label="Read-along text"></div>
+
+        <details class="raw">
+          <summary>Plain text &amp; downloads</summary>
+          <div class="result-actions">
+            <button class="btn btn-ghost" id="download-txt">Download .txt</button>
+            <button class="btn btn-ghost" id="download-tex">Download LaTeX (.mmd)</button>
+          </div>
+          <textarea id="result-text" readonly spellcheck="false"></textarea>
+        </details>
+      </section>
+
+      <section class="panel how">
+        <h2>How it works</h2>
+        <ol>
+          <li><strong>Render</strong> — each PDF page is rasterized in your browser (pdf.js).</li>
+          <li>
+            <strong>Recognize</strong> — the Nougat neural model reads each page into LaTeX/Markdown,
+            on your CPU or GPU.
+          </li>
+          <li>
+            <strong>Speak-ready</strong> — an open
+            <a href="https://github.com/w-witt/fuss/blob/main/pipeline/replacements.py">rule library</a>
+            turns LaTeX into plain English (so "x^2" is read "x squared"). Your feedback improves it.
+          </li>
+          <li>
+            <strong>Read aloud</strong> — your browser speaks the paper with word-by-word
+            highlighting. Click any sentence to start listening from there.
+          </li>
+        </ol>
+        <p class="privacy">🔒 Nothing is uploaded. The conversion happens entirely on your device.</p>
+      </section>
+    </main>
+
+    <footer>
+      <span>
+        Fuss · <a href="#" data-about-open>Why the name?</a> ·
+        <a href="https://github.com/w-witt/fuss">GitHub</a> · GPL-3.0
+      </span>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+name = "fuss-feedback"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Created via: wrangler kv namespace create FEEDBACK
+# Paste the returned id below.
+[[kv_namespaces]]
+binding = "FEEDBACK"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# ADMIN_KEY is set as a secret, not here:
+#   wrangler secret put ADMIN_KEY
