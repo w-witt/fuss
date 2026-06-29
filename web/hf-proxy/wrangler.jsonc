@@ -1,0 +1,9 @@
+{
+  // Cloudflare Worker that proxies huggingface.co model files with CORS.
+  // Deploy from this folder:  npx wrangler deploy
+  // It will publish at:       https://fuss-hf.<your-account>.workers.dev
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "name": "fuss-hf",
+  "main": "worker.js",
+  "compatibility_date": "2026-06-29"
+}

@@ -36,6 +36,14 @@ self.fetch = (input, init) => {
 // Pull weights from the HF hub; we ship no local models with the static site.
 env.allowLocalModels = false;
 
+// Fetch model files through our own Cloudflare proxy instead of huggingface.co
+// directly. Direct cross-origin fetches to huggingface.co fail on some networks
+// (e.g. campus SSL-inspecting proxies) even though Cloudflare/CDN hosts work —
+// the proxy makes model loading reliable for every tester. Deploy web/hf-proxy/
+// (npx wrangler deploy) and set this to its URL. Leave as huggingface.co to use
+// HF directly (works on unrestricted networks).
+env.remoteHost = 'https://fuss-hf.wwitt003.workers.dev';
+
 // Critical for a static host: without this, onnxruntime resolves its .wasm
 // relative to the worker's OWN origin (fuss.../ort-...wasm) and 404s — the
 // "Failed to fetch" on model load. Point it at the matching library dist, which
