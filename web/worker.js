@@ -23,18 +23,28 @@ import {
   RawImage,
 } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1';
 
+// Surface *which* request fails: turn an opaque "Failed to fetch" into the
+// actual URL, so model-load problems are diagnosable from the error alone.
+const _fetch = self.fetch.bind(self);
+self.fetch = (input, init) => {
+  const url = typeof input === 'string' ? input : input?.url || String(input);
+  return _fetch(input, init).catch((err) => {
+    throw new Error(`could not fetch ${url} — ${err.message}`);
+  });
+};
+
 // Pull weights from the HF hub; we ship no local models with the static site.
 env.allowLocalModels = false;
 
-// Robustness for a static host without cross-origin isolation (no COOP/COEP):
-//  - pin the onnxruntime WASM to the SAME CDN/version as the library so it
-//    can't 404 (a common "Failed to fetch"), and
-//  - force single-threaded WASM, since multi-threaded ORT needs SharedArrayBuffer
-//    which requires cross-origin isolation we intentionally don't enable.
+// Critical for a static host: without this, onnxruntime resolves its .wasm
+// relative to the worker's OWN origin (fuss.../ort-...wasm) and 404s — the
+// "Failed to fetch" on model load. Point it at the matching library dist, which
+// holds ort-wasm-simd-threaded.jsep.wasm. We do NOT force numThreads: the dist
+// ships only the threaded build, and ORT runs it single-threaded at runtime
+// when SharedArrayBuffer is absent (we don't enable cross-origin isolation).
 try {
   env.backends.onnx.wasm.wasmPaths =
     'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1/dist/';
-  env.backends.onnx.wasm.numThreads = 1;
 } catch (e) {
   // older/newer layouts — non-fatal
 }
