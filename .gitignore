@@ -9,3 +9,10 @@ output/
 paper2speech/
 .claude/settings.local.json
 feedback/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
