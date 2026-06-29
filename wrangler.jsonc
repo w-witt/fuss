@@ -1,0 +1,15 @@
+{
+  // Deploys the static browser-beta site in web/ as a Cloudflare Workers
+  // static-assets project (no server-side Worker code — assets only).
+  //
+  // Without this file, `wrangler deploy` auto-detects the repo and wrongly
+  // picks the Flask `templates/` folder. Pinning `assets.directory` to `web`
+  // makes it serve the actual beta app (web/index.html at the site root).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fuss",
+  "compatibility_date": "2026-06-29",
+  "assets": {
+    "directory": "web"
+  },
+  "workers_dev": true
+}
