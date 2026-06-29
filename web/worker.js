@@ -21,10 +21,23 @@ import {
   pipeline,
   env,
   RawImage,
-} from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+} from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1';
 
 // Pull weights from the HF hub; we ship no local models with the static site.
 env.allowLocalModels = false;
+
+// Robustness for a static host without cross-origin isolation (no COOP/COEP):
+//  - pin the onnxruntime WASM to the SAME CDN/version as the library so it
+//    can't 404 (a common "Failed to fetch"), and
+//  - force single-threaded WASM, since multi-threaded ORT needs SharedArrayBuffer
+//    which requires cross-origin isolation we intentionally don't enable.
+try {
+  env.backends.onnx.wasm.wasmPaths =
+    'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1/dist/';
+  env.backends.onnx.wasm.numThreads = 1;
+} catch (e) {
+  // older/newer layouts — non-fatal
+}
 
 const MODEL_ID = 'Xenova/nougat-small';
 const MAX_NEW_TOKENS = 3584; // a full page of dense math can be long
@@ -72,10 +85,16 @@ async function load() {
 
   // WASM / CPU fallback — quantized weights keep the download smaller.
   post({ type: 'status', message: 'Loading model on CPU (WASM)…' });
-  extractor = await pipeline('image-to-text', MODEL_ID, {
-    dtype: 'q8',
-    progress_callback: progressCallback,
-  });
+  try {
+    extractor = await pipeline('image-to-text', MODEL_ID, {
+      dtype: 'q8',
+      progress_callback: progressCallback,
+    });
+  } catch (e) {
+    // Make the common network failure legible instead of a bare "Failed to fetch".
+    throw new Error(`Model/runtime load failed (${e.message}). This is usually the ` +
+      `model weights or the onnxruntime WASM not downloading — check the Network tab.`);
+  }
   device = 'wasm';
   post({ type: 'ready', device });
 }

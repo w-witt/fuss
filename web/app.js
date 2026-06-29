@@ -41,6 +41,16 @@ let loadFailed = null; // error message if model load failed
 function ensureWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+  // Fires when the worker module itself can't load/parse (e.g. a CDN import is
+  // blocked) — otherwise this would hang silently waiting for 'ready'.
+  worker.onerror = (e) => {
+    loadFailed =
+      'Worker failed to load — a module import (transformers.js CDN) was blocked. ' +
+      (e.message || e.filename || '');
+    if (pageResolver && pageResolver.reject) pageResolver.reject(new Error(loadFailed));
+    pageResolver = null;
+    fail(loadFailed);
+  };
   worker.onmessage = (e) => {
     const msg = e.data;
     switch (msg.type) {
@@ -139,14 +149,17 @@ async function convert(file) {
   progress.reset();
   progress.show();
 
+  let stage = 'model';
   try {
     // 1. Load the model (downloads on first run; cached afterwards).
     await loadModelOnce();
 
     // 2. Open the PDF and count pages.
+    stage = 'pdf';
     const data = new Uint8Array(await file.arrayBuffer());
     const pdf = await pdfjsLib.getDocument({ data }).promise;
     const total = pdf.numPages;
+    stage = 'convert';
 
     // 3. Convert page by page; ETA derives from per-page timing.
     progress.startConversion(total);
@@ -168,7 +181,10 @@ async function convert(file) {
     showResult(text, file.name, segments);
     setFeedbackContext({ fileName: file.name, segments });
   } catch (err) {
-    fail(err?.message || String(err));
+    const where = { model: 'loading the model', pdf: 'reading the PDF', convert: 'converting a page' }[
+      stage
+    ];
+    fail(`Failed while ${where}: ${err?.message || String(err)}`);
   } finally {
     setBusy(false);
   }
