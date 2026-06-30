@@ -234,6 +234,48 @@ main {
   color: var(--text-muted);
 }
 
+/* Full-page reader: after conversion the PDF reader takes over the window. */
+body.reading .hero,
+body.reading .converter,
+body.reading .how,
+body.reading footer {
+  display: none;
+}
+body.reading main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+}
+body.reading .result {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+body.reading .reader-toolbar {
+  border-radius: 0;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0;
+}
+body.reading .voice-note {
+  padding: 0 1rem;
+  margin: 0.5rem 0;
+}
+body.reading .pdf-viewport {
+  flex: 1;
+  max-height: none;
+  border-radius: 0;
+}
+body.reading .raw {
+  margin: 0;
+  padding: 0.5rem 1rem;
+}
+
 /* PDF read-along surface */
 .pdf-viewport {
   position: relative;

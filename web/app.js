@@ -199,9 +199,25 @@ async function showResult(text, fileName, segments, pdfDoc) {
   progress.message('Rendering PDF…', '');
   els.resultText.value = text;
   els.result.style.display = 'block';
-  els.result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Take over the whole page: the converted PDF becomes the reader.
+  document.body.classList.add('reading');
   await buildReader(segments, pdfDoc);
-  progress.message('Done', `Converted ${fileName} — press Play to listen along`);
+  progress.hide();
+}
+
+function resetToUpload() {
+  if (reader) reader.stop();
+  if (pdfView) pdfView.destroy();
+  document.body.classList.remove('reading');
+  els.result.style.display = 'none';
+  progress.hide();
+  progress.reset();
+  currentFile = null;
+  els.fileName.textContent = '';
+  els.fileName.style.display = 'none';
+  els.fileInput.value = '';
+  els.convertBtn.disabled = true;
+  window.scrollTo({ top: 0 });
 }
 
 function setPlayLabel(state) {
@@ -325,6 +341,7 @@ export function init() {
     'play-btn',
     'prev-btn',
     'next-btn',
+    'new-btn',
     'rate',
     'rate-val',
     'voice',
@@ -370,6 +387,7 @@ export function init() {
   els.playBtn.addEventListener('click', () => reader && reader.toggle());
   els.prevBtn.addEventListener('click', () => reader && reader.prev());
   els.nextBtn.addEventListener('click', () => reader && reader.next());
+  els.newBtn.addEventListener('click', resetToUpload);
   els.rate.addEventListener('input', () => {
     const r = parseFloat(els.rate.value);
     els.rateVal.textContent = r.toFixed(1) + '×';

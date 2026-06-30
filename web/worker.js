@@ -124,9 +124,15 @@ async function convertPage({ index, total, width, height, buffer }) {
   // channels) and let the processor handle resizing/normalization.
   const image = new RawImage(new Uint8ClampedArray(buffer), width, height, 4).rgb();
 
+  // Nougat (especially the small model) is prone to decoder repetition loops
+  // — the upstream library kills them with a custom stopping criterion we don't
+  // have here, so suppress at the generation level: no_repeat_ngram_size blocks
+  // a phrase from repeating verbatim, and the penalty discourages near-repeats.
   const output = await extractor(image, {
     min_length: 1,
     max_new_tokens: MAX_NEW_TOKENS,
+    no_repeat_ngram_size: 4,
+    repetition_penalty: 1.2,
     bad_words_ids: [[extractor.tokenizer.unk_token_id]],
   });
 
