@@ -49,10 +49,11 @@ function splitIntoChunks(text, maxLen = 220) {
 }
 
 export class AudioReader {
-  constructor({ segments, container, onState }) {
+  constructor({ segments, container, onState, onWord }) {
     this.segments = segments;
-    this.container = container;
+    this.container = container || null; // optional text reader; null in PDF mode
     this.onState = onState || (() => {});
+    this.onWord = onWord || (() => {}); // fires with {segIndex, wordInSeg, global}
     this.rate = 1;
     this.voice = null;
     this.segIndex = 0;
@@ -60,39 +61,56 @@ export class AudioReader {
     this.chunks = [];
     this.playing = false;
     this.paused = false;
-    this.words = []; // per-segment: [{el, start, end}]
+    this.words = []; // per-segment: [{start, end, el?}]
+    this.segWordStart = []; // global index of each segment's first word
     this._keepAlive = null;
     this._build();
   }
 
   _build() {
-    this.container.innerHTML = '';
     this.words = [];
     this.segEls = [];
+    this.segWordStart = [];
+    let globalCount = 0;
+    if (this.container) this.container.innerHTML = '';
+
     this.segments.forEach((seg, i) => {
-      const tag = seg.segment_type === 'heading' ? 'h3' : 'p';
-      const el = document.createElement(tag);
-      el.className = 'seg';
-      el.dataset.index = String(i);
+      this.segWordStart[i] = globalCount;
+      let el = null;
+      if (this.container) {
+        const tag = seg.segment_type === 'heading' ? 'h3' : 'p';
+        el = document.createElement(tag);
+        el.className = 'seg';
+        el.dataset.index = String(i);
+      }
 
       const wordSpans = [];
       // Tokenize keeping whitespace so charIndex offsets line up with seg.text.
+      // The \S+ token order here MUST match the flat spoken-word list app.js
+      // feeds to the aligner, so `global` indexes line up with the PDF rects.
       const re = /\S+|\s+/g;
       let m;
       while ((m = re.exec(seg.text)) !== null) {
         const token = m[0];
         if (/\S/.test(token)) {
-          const span = document.createElement('span');
-          span.className = 'word';
-          span.textContent = token;
-          el.appendChild(span);
+          let span = null;
+          if (el) {
+            span = document.createElement('span');
+            span.className = 'word';
+            span.textContent = token;
+            el.appendChild(span);
+          }
           wordSpans.push({ el: span, start: m.index, end: m.index + token.length });
-        } else {
+        } else if (el) {
           el.appendChild(document.createTextNode(token));
         }
       }
-      el.addEventListener('click', () => this.playFrom(i));
-      this.container.appendChild(el);
+      globalCount += wordSpans.length;
+
+      if (el) {
+        el.addEventListener('click', () => this.playFrom(i));
+        this.container.appendChild(el);
+      }
       this.segEls.push(el);
       this.words.push(wordSpans);
     });
@@ -106,6 +124,7 @@ export class AudioReader {
   }
 
   _clearHighlight() {
+    if (!this.container) return;
     this.container.querySelectorAll('.word.speaking, .seg.active').forEach((el) =>
       el.classList.remove('speaking', 'active')
     );
@@ -113,21 +132,34 @@ export class AudioReader {
 
   _highlightWord(absCharIndex) {
     const list = this.words[this.segIndex] || [];
-    let target = null;
-    for (const w of list) {
-      if (absCharIndex >= w.start && absCharIndex < w.end) {
-        target = w.el;
+    let k = -1;
+    for (let i = 0; i < list.length; i++) {
+      if (absCharIndex >= list[i].start && absCharIndex < list[i].end) {
+        k = i;
         break;
       }
     }
-    if (!target) return;
-    const prev = this.container.querySelector('.word.speaking');
-    if (prev && prev !== target) prev.classList.remove('speaking');
-    target.classList.add('speaking');
+    if (k < 0) return;
+
+    // Text-reader highlight (only when a text container is in use).
+    if (this.container) {
+      const target = list[k].el;
+      const prev = this.container.querySelector('.word.speaking');
+      if (prev && prev !== target) prev.classList.remove('speaking');
+      if (target) target.classList.add('speaking');
+    }
+
+    // Drive the PDF read-along highlight via a global word index.
+    this.onWord({
+      segIndex: this.segIndex,
+      wordInSeg: k,
+      global: (this.segWordStart[this.segIndex] || 0) + k,
+    });
   }
 
   _markSegment() {
     this._clearHighlight();
+    if (!this.container) return;
     const el = this.segEls[this.segIndex];
     if (el) {
       el.classList.add('active');

@@ -21,7 +21,9 @@ PDF ──(pdf.js, rasterize pages)──▶ page images
 | `gate.js` | Invite-code gate for the private beta (`gen-code.mjs` makes codes) |
 | `about.js` | "Why 'Fuss'?" history modal (Nikolaus Fuss, Euler's scribe) |
 | `latex2text.js` | LaTeX/MMD → speakable text — **the library beta feedback improves** |
-| `tts.js` | Read-along audiobook engine (Web Speech API + word highlighting) |
+| `tts.js` | Audiobook engine (Web Speech API); emits the spoken word index |
+| `pdfview.js` | Renders the PDF + text-layer word boxes, moves the read-along highlight |
+| `aligner.js` | Fuzzy-aligns the spoken word stream to PDF word boxes (math-aware) |
 | `progress.js` | Two-phase progress with a real ETA (download, then per-page) |
 | `feedback.js` | Feedback widget → serverless endpoint or prefilled GitHub issue |
 | `feedback-worker/` | Deployable Cloudflare Worker that durably stores feedback (optional) |
@@ -90,10 +92,11 @@ node gen-code.mjs "FUSS-ADA-9F2K" # or pick your own
    conversion bar advances per page and shows "~Xm Ys remaining".
 4. Confirm plain text appears and math reads as words (e.g. "x squared",
    "summation over").
-5. Press **Play** (or Space): the paper is read aloud, the current section is
-   tinted, and the spoken word is highlighted. Try the **Speed** slider and
-   **Voice** picker; click any sentence to start listening from there; use
-   ⏮/⏭ to skip sections. Expand **Plain text & downloads** for .txt/.mmd.
+5. Press **Play** (or Space): the **rendered PDF** is shown and the word being
+   read is highlighted **on the page**, auto-scrolling as it goes. Try the
+   **Speed** slider and **Voice** picker; **click anywhere on the page** to start
+   listening from the nearest word; use ⏮/⏭ to skip sections. Expand
+   **Plain text & downloads** for .txt/.mmd.
 6. Click **Feedback**, submit a note → a prefilled GitHub issue opens (or the
    serverless endpoint receives it, if configured — see `feedback-worker/`).
 
@@ -102,9 +105,12 @@ node gen-code.mjs "FUSS-ADA-9F2K" # or pick your own
 - TTS uses the browser's built-in voices (Web Speech API) — fully local, no
   extra download. Voice quality depends on the OS; macOS/Windows ship good
   natural voices, which the voice picker prefers automatically.
-- Word-by-word highlighting relies on `boundary` events, which fire in
-  Chrome/Edge. In browsers that don't emit them (e.g. some Safari versions),
-  playback still works but only the current **section** is highlighted.
+- Word highlighting **on the PDF** relies on `boundary` events (fire in
+  Chrome/Edge). In browsers that don't emit them, playback still works but the
+  on-page highlight won't advance per word.
+- The spoken stream (from Nougat, with math verbalized) is fuzzy-aligned to the
+  PDF's own text layer (`aligner.js`). Alignment is best-effort: dense equations
+  or figures may briefly desync, then re-sync on the next distinctive word.
 
 ## Deploy (Cloudflare Pages)
 

@@ -8,16 +8,20 @@
  * browser. The page count from pdf.js drives the conversion ETA.
  */
 
-import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.min.mjs';
+import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs';
 import markdownit from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
 import { processMmd, segmentsToText } from './latex2text.js';
 import { Progress } from './progress.js';
 import { initFeedback, setFeedbackContext } from './feedback.js';
 import { AudioReader, loadVoices, ttsSupported } from './tts.js';
 import { initAbout } from './about.js';
+import { PdfView } from './pdfview.js';
+import { align } from './aligner.js';
 
+// Pinned to 4.0.379: this build exposes renderTextLayer, which pdfview.js uses
+// to measure per-word boxes for the read-along highlight.
 pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.worker.min.mjs';
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
 
 const md = markdownit({ html: false, linkify: false });
 const renderMarkdown = (s) => md.render(s);
@@ -32,6 +36,7 @@ let modelReady = false;
 let currentFile = null;
 let lastResult = null; // { mmd, text, segments }
 let reader = null; // AudioReader instance
+let pdfView = null; // PdfView instance
 let selectedVoice = null;
 
 // --- Worker plumbing: one in-flight page at a time, promise per page --------
@@ -178,8 +183,8 @@ async function convert(file) {
     const text = segmentsToText(segments);
 
     lastResult = { mmd, text, segments };
-    showResult(text, file.name, segments);
     setFeedbackContext({ fileName: file.name, segments });
+    await showResult(text, file.name, segments, pdf);
   } catch (err) {
     const where = { model: 'loading the model', pdf: 'reading the PDF', convert: 'converting a page' }[
       stage
@@ -190,12 +195,13 @@ async function convert(file) {
   }
 }
 
-function showResult(text, fileName, segments) {
-  progress.message('Done', `Converted ${fileName} — press Play to listen`);
+async function showResult(text, fileName, segments, pdfDoc) {
+  progress.message('Rendering PDF…', '');
   els.resultText.value = text;
-  buildReader(segments);
   els.result.style.display = 'block';
   els.result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  await buildReader(segments, pdfDoc);
+  progress.message('Done', `Converted ${fileName} — press Play to listen along`);
 }
 
 function setPlayLabel(state) {
@@ -203,18 +209,71 @@ function setPlayLabel(state) {
   els.readerPos.textContent = state.total
     ? `Section ${Math.min(state.segIndex + 1, state.total)} / ${state.total}`
     : '';
+  // Stopped/finished (not merely paused) → drop the on-page highlight.
+  if (pdfView && !state.playing) pdfView.clearHighlight();
 }
 
-function buildReader(segments) {
+// Split each segment into its \S+ tokens, flattened in playback order. Must
+// match tts.js's tokenization so word indices line up with the aligner's rects.
+function flattenSpokenWords(segments) {
+  const words = [];
+  const wordSeg = [];
+  segments.forEach((seg, i) => {
+    for (const m of seg.text.matchAll(/\S+/g)) {
+      words.push(m[0]);
+      wordSeg.push(i);
+    }
+  });
+  return { words, wordSeg };
+}
+
+async function buildReader(segments, pdfDoc) {
   if (reader) reader.destroy();
+  if (pdfView) pdfView.destroy();
+
+  // Render the actual PDF and align the spoken stream to its words so the
+  // word being read lights up on the page (the Fuss e-reader experience).
+  pdfView = new PdfView(pdfjsLib, els.pdfViewport);
+  await pdfView.render(pdfDoc);
+  const pdfWords = pdfView.getAllWords();
+  const { words: spokenWords, wordSeg } = flattenSpokenWords(segments);
+  const rects = align(spokenWords, pdfWords);
+
   if (!ttsSupported()) {
     els.playBtn.disabled = true;
     els.playBtn.textContent = 'Speech not supported';
-    return;
   }
-  reader = new AudioReader({ segments, container: els.reader, onState: setPlayLabel });
+
+  reader = new AudioReader({
+    segments,
+    container: null, // PDF is the reading surface; no separate text pane
+    onState: setPlayLabel,
+    onWord: ({ global }) => {
+      const rect = rects[global];
+      if (rect) pdfView.highlightRect(rect, true);
+    },
+  });
   reader.setRate(parseFloat(els.rate.value));
   if (selectedVoice) reader.setVoice(selectedVoice);
+
+  // Click a spot on the page → start reading from the nearest aligned word.
+  pdfView.onPageClick((pt) => {
+    let best = -1;
+    let bestDist = Infinity;
+    for (let g = 0; g < rects.length; g++) {
+      const r = rects[g];
+      if (!r || r.page !== pt.page) continue;
+      const cx = r.x + r.w / 2;
+      const cy = r.y + r.h / 2;
+      const d = (cx - pt.x) ** 2 + (cy - pt.y) ** 2;
+      if (d < bestDist) {
+        bestDist = d;
+        best = g;
+      }
+    }
+    if (best >= 0) reader.playFrom(wordSeg[best]);
+  });
+
   setPlayLabel({ playing: false, paused: false, segIndex: 0, total: segments.length });
 }
 
@@ -269,7 +328,7 @@ export function init() {
     'rate',
     'rate-val',
     'voice',
-    'reader',
+    'pdf-viewport',
     'reader-pos',
     'voice-note',
   ]) {

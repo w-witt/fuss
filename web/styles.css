@@ -8,6 +8,7 @@
   --accent-soft: rgba(233, 69, 96, 0.12);
   --border: #2a2a4a;
   --ok: #3ddc97;
+  --highlight: rgba(255, 213, 79, 0.6);
 }
 
 * {
@@ -233,36 +234,57 @@ main {
   color: var(--text-muted);
 }
 
-.reader {
-  max-height: 60vh;
+/* PDF read-along surface */
+.pdf-viewport {
+  position: relative;
+  max-height: 72vh;
   overflow-y: auto;
-  padding: 0.5rem 0.2rem;
-  font-size: 1.02rem;
-  line-height: 1.75;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0.5rem;
+  background: #2a2a3e;
+  border-radius: 8px;
 }
-.reader .seg {
-  margin: 0 0 1rem;
-  padding: 0.35rem 0.6rem;
-  border-radius: 6px;
+.pdf-page {
+  position: relative;
+  max-width: 100%;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   cursor: pointer;
-  transition: background 0.2s;
 }
-.reader .seg:hover {
-  background: rgba(255, 255, 255, 0.03);
+.pdf-page canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 2px;
 }
-.reader h3.seg {
-  font-size: 1.15rem;
-  color: var(--text);
-  font-weight: 700;
+/* pdf.js text layer: invisible, just for measuring word boxes */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+  line-height: 1;
+  pointer-events: none;
 }
-.reader .seg.active {
-  background: var(--accent-soft);
+.textLayer span,
+.textLayer br {
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0 0;
 }
-.reader .word.speaking {
-  background: var(--accent);
-  color: #fff;
+/* The word being read aloud, highlighted on the page */
+.word-highlight {
+  position: absolute;
+  display: none;
+  background: var(--highlight);
   border-radius: 3px;
-  box-shadow: 0 0 0 2px var(--accent);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  transition: left 0.12s ease, top 0.12s ease, width 0.12s ease, height 0.12s ease;
 }
 
 .raw {
