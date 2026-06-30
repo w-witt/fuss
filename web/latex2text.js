@@ -275,6 +275,46 @@ export function applyTextRules(text) {
   return text;
 }
 
+/**
+ * Crop Nougat's repetition loops. The small model often degenerates into the
+ * same sentence repeated many times (sometimes with tiny variations that slip
+ * past token-level no_repeat_ngram). This collapses consecutive duplicate
+ * sentences and caps any substantial sentence at two occurrences — mirroring,
+ * in post-processing, the repetition stopper the upstream library applies
+ * during generation.
+ */
+export function dedupeRepeats(text) {
+  if (!text) return text;
+  const units = text.split(/(?<=[.!?])\s+/);
+  if (units.length < 3) return text;
+
+  const norm = (u) =>
+    u
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const out = [];
+  const seen = new Map();
+  let prevKey = null;
+  for (const u of units) {
+    const key = norm(u);
+    if (!key) {
+      out.push(u);
+      continue;
+    }
+    const wordCount = key.split(' ').length;
+    const count = (seen.get(key) || 0) + 1;
+    seen.set(key, count);
+    if (key === prevKey) continue; // collapse a run of identical sentences
+    if (wordCount >= 4 && count > 2) continue; // cap a long sentence at 2 total
+    prevKey = key;
+    out.push(u);
+  }
+  return out.join(' ');
+}
+
 /** Fix MMD quirks before Markdown parsing. Mirrors _preprocess_mmd. */
 export function preprocessMmd(content) {
   // Put each \[...\] block on its own paragraph.
@@ -386,7 +426,9 @@ export function processMmd(mmd, { renderMarkdown, parseHtml }) {
   const segments = [];
   const blocks = doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, section');
   blocks.forEach((el) => {
-    const rawText = el.textContent.replace(/\s+/g, ' ').trim();
+    // Crop runaway repetition within a block (the common case: one paragraph
+    // that loops the same sentence) before anything else.
+    const rawText = dedupeRepeats(el.textContent.replace(/\s+/g, ' ').trim());
     if (!rawText) return;
 
     const name = el.nodeName.toLowerCase();
@@ -399,9 +441,32 @@ export function processMmd(mmd, { renderMarkdown, parseHtml }) {
     }
   });
 
-  const stripped = stripAuthorLines(segments);
+  const deduped = dedupeSegments(segments); // catch loops split across paragraphs
+  const stripped = stripAuthorLines(deduped);
   stripped.forEach((seg, i) => (seg.index = i));
   return stripped;
+}
+
+/** Drop consecutive duplicate segments and cap any repeated long segment at 2x. */
+function dedupeSegments(segments) {
+  const out = [];
+  const seen = new Map();
+  let prevKey = null;
+  for (const seg of segments) {
+    const key = seg.text
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const wordCount = key ? key.split(' ').length : 0;
+    const count = (seen.get(key) || 0) + 1;
+    seen.set(key, count);
+    if (key && key === prevKey) continue;
+    if (wordCount >= 4 && count > 2) continue;
+    prevKey = key;
+    out.push(seg);
+  }
+  return out;
 }
 
 /** Convenience: segments → a single plain-text document. */

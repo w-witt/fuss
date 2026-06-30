@@ -2,7 +2,13 @@
  * Cross-checks the JS port against the Python pipeline's behaviour.
  * Run: node web/latex2text.test.mjs
  */
-import { speakMath, applyTextRules, preprocessMmd, speakMathSpans } from './latex2text.js';
+import {
+  speakMath,
+  applyTextRules,
+  preprocessMmd,
+  speakMathSpans,
+  dedupeRepeats,
+} from './latex2text.js';
 
 let pass = 0,
   fail = 0;
@@ -40,6 +46,20 @@ eq('citation removal', applyTextRules('a result [12] holds'), 'a result holds');
 eq('author-year removal', applyTextRules('shown (Smith, 2020) clearly'), 'shown clearly');
 eq('emphasis strip', applyTextRules('a *bold* word'), 'a bold word');
 eq('wrt', applyTextRules('w.r.t. x'), 'with respect to x');
+
+// --- dedupeRepeats (Nougat loop cropping) ------------------------------------
+{
+  const loop = ('The BG group is a subset of the BG group. '.repeat(20)).trim();
+  const out = dedupeRepeats(loop);
+  // The runaway loop collapses to a single sentence.
+  eq('loop collapses', out, 'The BG group is a subset of the BG group.');
+}
+eq(
+  'distinct sentences kept',
+  dedupeRepeats('First claim here. Second different claim. Third one too.'),
+  'First claim here. Second different claim. Third one too.'
+);
+eq('short text untouched', dedupeRepeats('Just one sentence.'), 'Just one sentence.');
 
 // --- preprocessMmd -----------------------------------------------------------
 eq(
