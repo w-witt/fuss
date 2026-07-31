@@ -34,6 +34,10 @@ function buildRecord(category, comment) {
     comment: comment.slice(0, 5000),
     file_name: (context.fileName || '').slice(0, 200),
     segment_count: context.segments?.length || 0,
+    // Conversion-quality lint (mmdlint.js): how many invented LaTeX commands
+    // the OCR produced, and on which pages. Separates "the OCR degenerated"
+    // reports from genuine gaps in the replacement rules.
+    lint: context.lint || null,
     user_agent: navigator.userAgent,
   };
 }
@@ -60,7 +64,12 @@ async function submit(category, comment) {
     comment,
     '',
     '---',
-    `_segments: ${record.segment_count} · ${record.user_agent}_`,
+    `_segments: ${record.segment_count}` +
+      (record.lint
+        ? ` · lint: ${record.lint.unknown_commands}/${record.lint.total_commands} unknown` +
+          (record.lint.bad_pages.length ? ` (pages ${record.lint.bad_pages.join(', ')})` : '')
+        : '') +
+      ` · ${record.user_agent}_`,
   ].join('\n');
   const url = `${GITHUB_REPO}/issues/new?labels=beta-feedback&title=${encodeURIComponent(
     title

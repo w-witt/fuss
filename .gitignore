@@ -9,3 +9,7 @@ output/
 paper2speech/
 .claude/settings.local.json
 feedback/
+
+# local samples / large reference archives
+comprehensive.zip
+Sample PDF/

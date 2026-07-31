@@ -9,6 +9,7 @@ import {
   speakMathSpans,
   dedupeRepeats,
 } from './latex2text.js';
+import { lintMmd, lintLooksBad } from './mmdlint.js';
 
 let pass = 0,
   fail = 0;
@@ -36,6 +37,21 @@ eq('hat', speakMath('\\hat{x}'), 'x hat');
 eq('in', speakMath('x \\in S'), 'x in S');
 // replacements are space-wrapped, so stripped delimiters leave a word break
 eq('strip braces/backslash', speakMath('\\foo{bar}'), 'foo bar');
+// nested structures resolve innermost-first
+eq(
+  'nested frac in superscript',
+  speakMath('x^{\\frac{1}{\\sqrt{2}}}'),
+  'x to the 1 over square root of 2'
+);
+eq('nested sqrt in frac', speakMath('\\frac{\\sqrt{2}}{2}'), 'square root of 2 over 2');
+eq('cong', speakMath('A \\cong B'), 'A is isomorphic to B');
+eq(
+  'rtimes',
+  speakMath('\\mathbb{Z}\\rtimes\\mathbb{Z}'),
+  'Z semidirect product with Z'
+);
+eq('not in', speakMath('a \\not\\in S'), 'a is not in S');
+eq('log base', speakMath('\\log_{2}(x)'), 'log base 2 of (x)');
 
 // --- applyTextRules ----------------------------------------------------------
 eq('ie', applyTextRules('See i.e. this'), 'See that is this');
@@ -44,6 +60,10 @@ eq('iid', applyTextRules('the iid samples'), 'the independent and identically di
 eq('Fig', applyTextRules('Fig. 3 shows'), 'Figure 3 shows');
 eq('citation removal', applyTextRules('a result [12] holds'), 'a result holds');
 eq('author-year removal', applyTextRules('shown (Smith, 2020) clearly'), 'shown clearly');
+// spaced number lists are citations; unspaced ones are math and must survive
+eq('paren citation removal', applyTextRules('a result (1, 2) holds'), 'a result holds');
+eq('group argument kept', applyTextRules('the group BG(1,2) acts'), 'the group BG(1,2) acts');
+eq('tuple kept', applyTextRules('a maps to (1,0) here'), 'a maps to (1,0) here');
 eq('emphasis strip', applyTextRules('a *bold* word'), 'a bold word');
 eq('wrt', applyTextRules('w.r.t. x'), 'with respect to x');
 
@@ -84,6 +104,20 @@ eq(
   speakMathSpans('let $x \\leq y$ hold').replace(/\s+/g, ' ').trim(),
   'let x less than or equal to y hold'
 );
+
+// --- mmdlint (fidelity linter) ------------------------------------------------
+{
+  const clean = lintMmd('the map \\alpha\\colon A \\to B with \\frac{1}{2}');
+  eq('lint: real commands pass', clean.unknown.length, 0);
+  const dirty = lintMmd('so \\begindagger{tabular line} and \\multimd=x');
+  eq(
+    'lint: invented commands flagged',
+    dirty.unknown.map((u) => u.command).join(','),
+    '\\begindagger,\\multimd'
+  );
+  eq('lint: clean page not bad', lintLooksBad(clean), false);
+  eq('lint: 3+ unknowns is bad', lintLooksBad({ total: 9, unknown: [1, 2, 3], badRatio: 0.33 }), true);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

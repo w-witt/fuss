@@ -483,6 +483,13 @@ footer {
   padding: 0 0.25rem;
   border-radius: 3px;
 }
+/* Conversion-quality note (mmdlint): muted green when clean, amber on trouble. */
+#lint-note {
+  color: var(--ok);
+}
+#lint-note.lint-warn {
+  color: #ffd54f;
+}
 
 /* --- Access gate ---------------------------------------------------------- */
 body.gated {

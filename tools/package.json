@@ -1,0 +1,11 @@
+{
+  "name": "fuss-debug-tools",
+  "private": true,
+  "type": "module",
+  "description": "CLI harnesses to debug the web pipeline stage by stage",
+  "dependencies": {
+    "@huggingface/transformers": "3.7.1",
+    "linkedom": "^0.18",
+    "markdown-it": "^14"
+  }
+}

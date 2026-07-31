@@ -50,7 +50,9 @@ export const textReplacements = [
   [/<break time="0\.5s"><\/break>/g, '<break time="0.5s"/>'],
   // remove references: [1], [1, 2], [14] etc. but NOT (0), (1) which may be math
   [/\s*\[[0-9,\-, ]+(, pp\. [0-9,\-]+|, p\.\d+f?f?\.?)?\]/g, ''],
-  [/\s*\([0-9]+(?:[,\-, ]+[0-9]+)+(, pp\. [0-9,\-]+|, p\.\d+f?f?\.?)?\)/g, ''],
+  // paren citations need a space after each comma — "(1, 2)" is a citation,
+  // "(1,2)" is math (a tuple, or the argument of BG(1,2) / BS(1,2))
+  [/\s*\(\d+(?:(?:,\s+|\s*[-–]\s*)\d+)+(, pp\. [0-9,\-]+|, p\.\d+f?f?\.?)?\)/g, ''],
   [/\s*\[[^\]]*, \d{4}(?:, [^\]]*, \d{4})*\]/g, ''],
   [/\s*\([^)]*, \d{4}(?:[;,] [^)]*, \d{4}[a-zA-Z]*?)*\)/g, ''],
   [/\s*(\b\w+\s+et al\.) (\[\d{4}\]|\(\d{4}\))/g, '$1'],
@@ -95,7 +97,9 @@ export const mathReplacements = [
   [/\\sqrt\[3]{([^}]+)}/g, 'cube root of $1'],
   [/\\sqrt\[(\d+)]{([^}]+)}/g, '$1-th root of $2'],
 
-  // Logarithmic and exponential functions
+  // Logarithmic and exponential functions (subscripted base first)
+  [/\\log_\{([^}]+)\}/g, 'log base $1 of'],
+  [/\\log_(\w)/g, 'log base $1 of'],
   [/\\ln/g, 'natural log of'],
   [/\\log/g, 'log of'],
   [/\\exp/g, 'e to the'],
@@ -126,6 +130,9 @@ export const mathReplacements = [
   [/\\approx/g, 'approximately'],
 
   // Relations
+  [/\\cong/g, 'is isomorphic to'],
+  [/\\rtimes/g, 'semidirect product with'],
+  [/\\ltimes/g, 'semidirect product with'],
   [/\\sim/g, 'distributed as'],
   [/\\propto/g, 'proportional to'],
   [/\\odot/g, 'element-wise'],
@@ -144,6 +151,7 @@ export const mathReplacements = [
   [/\\Leftrightarrow/g, 'if and only if'],
   [/\\mapsto/g, 'maps to'],
   [/\\to/g, 'to'],
+  [/\\not\s*\\in/g, 'is not in'],
   [/\\in/g, 'in'],
 
   // Greek letters (capitals first — longer names match before shorter)
@@ -259,6 +267,19 @@ export const mathReplacements = [
 /** Convert a LaTeX math expression to spoken English. Mirrors _speak_math. */
 export function speakMath(latex) {
   let result = latex;
+  // Expand nested fractions/roots innermost-first before the flat rule table:
+  // its single-pass regexes use [^}]+ and can't see through nesting, which
+  // turned ^{\frac{1}{\sqrt{2}}} into "to the over 1 square root of 2".
+  // [^{}]* only matches brace-free arguments, so looping resolves inside-out.
+  let prev;
+  do {
+    prev = result;
+    result = result
+      .replace(/\\[td]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, ' $1 over $2 ')
+      .replace(/\\sqrt\s*\[3\]\s*\{([^{}]*)\}/g, ' cube root of $1 ')
+      .replace(/\\sqrt\s*\[(\d+)\]\s*\{([^{}]*)\}/g, ' $1-th root of $2 ')
+      .replace(/\\sqrt\s*\{([^{}]*)\}/g, ' square root of $1 ');
+  } while (result !== prev);
   for (const [pattern, replacement] of mathReplacements) {
     result = result.replace(pattern, ' ' + replacement + ' ');
   }
@@ -436,7 +457,9 @@ export function processMmd(mmd, { renderMarkdown, parseHtml }) {
 
     const segType = name.startsWith('h') ? 'heading' : 'paragraph';
     let spoken = applyTextRules(rawText).replace(/\s+/g, ' ').trim();
-    if (spoken) {
+    // Nothing speakable (e.g. a lone "(" or ")" left over from an equation
+    // tag rendered as its own paragraph) → skip.
+    if (spoken && /[a-zA-Z0-9]/.test(spoken)) {
       segments.push({ text: spoken, source_text: rawText, segment_type: segType, index: 0 });
     }
   });
@@ -447,7 +470,7 @@ export function processMmd(mmd, { renderMarkdown, parseHtml }) {
   return stripped;
 }
 
-/** Drop consecutive duplicate segments and cap any repeated long segment at 2x. */
+/** Drop consecutive duplicate segments and cap repeated segments. */
 function dedupeSegments(segments) {
   const out = [];
   const seen = new Map();
@@ -462,6 +485,9 @@ function dedupeSegments(segments) {
     const count = (seen.get(key) || 0) + 1;
     seen.set(key, count);
     if (key && key === prevKey) continue;
+    // An identical ≥10-word block appearing twice is a Nougat artifact (it
+    // re-emits front-matter footnotes at the end of the page), not prose.
+    if (wordCount >= 10 && count > 1) continue;
     if (wordCount >= 4 && count > 2) continue;
     prevKey = key;
     out.push(seg);

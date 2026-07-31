@@ -59,6 +59,7 @@ try {
 
 const MODEL_ID = 'Xenova/nougat-small';
 const MAX_NEW_TOKENS = 3584; // a full page of dense math can be long
+const MIN_LENGTH = 1024; // block early EOS: a dense page is ~1k tokens
 
 let extractor = null; // image-to-text pipeline
 let device = 'wasm';
@@ -124,15 +125,18 @@ async function convertPage({ index, total, width, height, buffer }) {
   // channels) and let the processor handle resizing/normalization.
   const image = new RawImage(new Uint8ClampedArray(buffer), width, height, 4).rgb();
 
-  // Nougat (especially the small model) is prone to decoder repetition loops
-  // — the upstream library kills them with a custom stopping criterion we don't
-  // have here, so suppress at the generation level: no_repeat_ngram_size blocks
-  // a phrase from repeating verbatim, and the penalty discourages near-repeats.
+  // Nougat's dominant failure here is the early-EOS "page skip": the decoder
+  // emits end-of-sequence right after a page's front matter and the whole body
+  // is silently dropped (verified on real papers with tools/pdf2mmd.mjs).
+  // min_length forbids EOS until a page's worth of tokens is out, which
+  // recovers the body. Do NOT add no_repeat_ngram_size / repetition_penalty:
+  // math legitimately repeats short token runs (^{-1}, b^{-1}…), and blocking
+  // repeats mangles it badly. The cost of min_length is that a sparse page
+  // pads its tail with repetition loops — dedupeRepeats/dedupeSegments in
+  // latex2text.js crop those in post-processing.
   const output = await extractor(image, {
-    min_length: 1,
+    min_length: MIN_LENGTH,
     max_new_tokens: MAX_NEW_TOKENS,
-    no_repeat_ngram_size: 4,
-    repetition_penalty: 1.2,
     bad_words_ids: [[extractor.tokenizer.unk_token_id]],
   });
 

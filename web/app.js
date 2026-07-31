@@ -11,6 +11,7 @@
 import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs';
 import markdownit from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
 import { processMmd, segmentsToText } from './latex2text.js';
+import { lintMmd, lintLooksBad } from './mmdlint.js';
 import { Progress } from './progress.js';
 import { initFeedback, setFeedbackContext } from './feedback.js';
 import { AudioReader, loadVoices, ttsSupported } from './tts.js';
@@ -176,14 +177,33 @@ async function convert(file) {
       progress.pageDone();
     }
 
-    // 4. LaTeX/MMD → speakable plain text (the feedback-improvable library).
+    // 4. Fidelity lint: invented control sequences (\begindagger…) mean a span
+    // of the OCR degenerated. Per page, so the warning names where to look.
+    const pageLints = mmdPages.map((m, i) => ({ page: i + 1, ...lintMmd(m) }));
+    const badPages = pageLints.filter(lintLooksBad);
+    for (const l of pageLints) {
+      for (const u of l.unknown) {
+        console.warn(`[fuss] page ${l.page}: unknown LaTeX ${u.command} in “…${u.context}…”`);
+      }
+    }
+    showLintNote(pageLints, badPages);
+
+    // 5. LaTeX/MMD → speakable plain text (the feedback-improvable library).
     const mmd = mmdPages.join('\n\n');
     progress.message('Cleaning up text…', '');
     const segments = processMmd(mmd, { renderMarkdown, parseHtml });
     const text = segmentsToText(segments);
 
-    lastResult = { mmd, text, segments };
-    setFeedbackContext({ fileName: file.name, segments });
+    lastResult = { mmd, text, segments, lint: pageLints };
+    setFeedbackContext({
+      fileName: file.name,
+      segments,
+      lint: {
+        unknown_commands: pageLints.reduce((n, l) => n + l.unknown.length, 0),
+        total_commands: pageLints.reduce((n, l) => n + l.total, 0),
+        bad_pages: badPages.map((l) => l.page),
+      },
+    });
     await showResult(text, file.name, segments, pdf);
   } catch (err) {
     const where = { model: 'loading the model', pdf: 'reading the PDF', convert: 'converting a page' }[
@@ -293,6 +313,26 @@ async function buildReader(segments, pdfDoc) {
   setPlayLabel({ playing: false, paused: false, segIndex: 0, total: segments.length });
 }
 
+// Conversion-quality note under the reader toolbar. Green when the whole
+// document lints clean; a per-page warning when OCR degeneration was detected
+// (details for each hit are in the console).
+function showLintNote(pageLints, badPages) {
+  const el = els.lintNote;
+  if (!el) return;
+  if (!badPages.length) {
+    el.textContent = '✓ Conversion check: no invalid LaTeX detected.';
+    el.classList.remove('lint-warn');
+  } else {
+    const pages = badPages.map((l) => l.page).join(', ');
+    el.textContent =
+      `⚠️ Conversion check: page${badPages.length > 1 ? 's' : ''} ${pages} may not have ` +
+      `converted cleanly (invalid LaTeX detected) and may read as gibberish there. ` +
+      `Re-converting sometimes helps; the Feedback button sends us the details.`;
+    el.classList.add('lint-warn');
+  }
+  el.style.display = 'block';
+}
+
 function fail(message) {
   progress.message('Something went wrong', message);
   els.result.style.display = 'none';
@@ -348,6 +388,7 @@ export function init() {
     'pdf-viewport',
     'reader-pos',
     'voice-note',
+    'lint-note',
   ]) {
     els[camel(id)] = document.getElementById(id);
   }
