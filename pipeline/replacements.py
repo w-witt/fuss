@@ -28,6 +28,8 @@ text_replacements = [
     (r'<break time="0.5s"></break>', r'<break time="0.5s"/>'),
     # remove references: [1], [1, 2], [14] etc. but NOT (0), (1) which may be math
     (r'\s*\[[0-9,-, ]+(, pp\. [0-9,-]+|, p\.\d+[f]?[f]?\.?)?\]', ''),
+    # alphabetic citation labels: [Bau69], [MK10], [NB22a, Section 3]
+    (r'\s*\[[A-Z][A-Za-z]{0,7}\d{2,4}[a-z]?(?:,\s*(?:[A-Z][A-Za-z]{0,7}\d{2,4}[a-z]?|[^\[\]]{0,30}))*\]', ''),
     (r'\s*\([0-9]+(?:[,-, ]+[0-9]+)+(, pp\. [0-9,-]+|, p\.\d+[f]?[f]?\.?)?\)', ''),
     (r'\s*\[[^\]]*, \d{4}(?:, [^\]]*, \d{4})*\]', ''),
     (r'\s*\([^\)]*, \d{4}(?:[;,] [^\)]*, \d{4}[a-zA-Z]*?)*\)', ''),

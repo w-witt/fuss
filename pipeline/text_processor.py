@@ -204,6 +204,7 @@ _METADATA_FOOTNOTE_RES = [
     re.compile(r'^(partially |gratefully )?(supported|funded) (in part )?by\b', re.I),
     re.compile(r'^funding\s*[.:;]', re.I),
     re.compile(r'^e-?mail address(es)?\s*[.:;]', re.I),
+    re.compile(r'^date\s*[.:]', re.I),  # amsart \date footnote
 ]
 
 # Keywords/MSC glued onto the end of a real paragraph (Nougat sometimes merges

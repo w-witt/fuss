@@ -6,6 +6,7 @@
   "dependencies": {
     "@huggingface/transformers": "3.7.1",
     "linkedom": "^0.18",
-    "markdown-it": "^14"
+    "markdown-it": "^14",
+    "pdfjs-dist": "^4.0.379"
   }
 }

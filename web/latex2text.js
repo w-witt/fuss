@@ -50,6 +50,8 @@ export const textReplacements = [
   [/<break time="0\.5s"><\/break>/g, '<break time="0.5s"/>'],
   // remove references: [1], [1, 2], [14] etc. but NOT (0), (1) which may be math
   [/\s*\[[0-9,\-, ]+(, pp\. [0-9,\-]+|, p\.\d+f?f?\.?)?\]/g, ''],
+  // alphabetic citation labels: [Bau69], [MK10], [NB22a, Section 3]
+  [/\s*\[[A-Z][A-Za-z]{0,7}\d{2,4}[a-z]?(?:,\s*(?:[A-Z][A-Za-z]{0,7}\d{2,4}[a-z]?|[^[\]]{0,30}))*\]/g, ''],
   // paren citations need a space after each comma — "(1, 2)" is a citation,
   // "(1,2)" is math (a tuple, or the argument of BG(1,2) / BS(1,2))
   [/\s*\(\d+(?:(?:,\s+|\s*[-–]\s*)\d+)+(, pp\. [0-9,\-]+|, p\.\d+f?f?\.?)?\)/g, ''],
@@ -448,6 +450,7 @@ const metadataFootnoteRes = [
   /^(partially |gratefully )?(supported|funded) (in part )?by\b/i,
   /^funding\s*[.:;]/i,
   /^e-?mail address(es)?\s*[.:;]/i,
+  /^date\s*[.:]/i, // amsart \date footnote
 ];
 
 // Keywords/MSC glued onto the end of a real paragraph (Nougat sometimes merges

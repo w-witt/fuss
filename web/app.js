@@ -1,16 +1,22 @@
 /**
  * app.js — client-side orchestration for Fuss in the browser.
  *
- *   PDF → (pdf.js) page images → (worker: Nougat) LaTeX/MMD per page
+ *   PDF → (textlayer.js) embedded text → LaTeX/MMD per page   ← primary
+ *       ↘ (pdf.js page images → worker: Nougat)               ← fallback, per page
  *       → (latex2text.js) speakable plain text → display + download
  *
- * Everything runs on the visitor's own machine; the PDF never leaves the
- * browser. The page count from pdf.js drives the conversion ETA.
+ * Born-digital PDFs carry their own text, so the primary path reads it
+ * directly — perfect prose fidelity, no model download, near-instant. Nougat
+ * only runs on pages the extractor can't linearize confidently (stacked
+ * fractions, no text layer at all), so hallucination risk is confined to
+ * those pages. Everything runs on the visitor's own machine; the PDF never
+ * leaves the browser.
  */
 
 import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs';
 import markdownit from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
 import { processMmd, segmentsToText } from './latex2text.js';
+import { extractPageMmd, resolveFontNames } from './textlayer.js';
 import { lintMmd, lintLooksBad } from './mmdlint.js';
 import { Progress } from './progress.js';
 import { initFeedback, setFeedbackContext } from './feedback.js';
@@ -29,6 +35,10 @@ const renderMarkdown = (s) => md.render(s);
 const parseHtml = (h) => new DOMParser().parseFromString(h, 'text/html');
 
 const TARGET_WIDTH = 1280; // rasterization width fed to Nougat
+
+// Below this per-page confidence the text-layer extraction is presumed
+// garbled (heavy stacked math) and the page goes to Nougat instead.
+const TL_CONFIDENCE_MIN = 0.6;
 
 const els = {};
 let worker = null;
@@ -155,26 +165,47 @@ async function convert(file) {
   progress.reset();
   progress.show();
 
-  let stage = 'model';
+  let stage = 'pdf';
   try {
-    // 1. Load the model (downloads on first run; cached afterwards).
-    await loadModelOnce();
-
-    // 2. Open the PDF and count pages.
-    stage = 'pdf';
+    // 1. Open the PDF and count pages.
     const data = new Uint8Array(await file.arrayBuffer());
     const pdf = await pdfjsLib.getDocument({ data }).promise;
     const total = pdf.numPages;
-    stage = 'convert';
 
-    // 3. Convert page by page; ETA derives from per-page timing.
-    progress.startConversion(total);
-    const mmdPages = [];
+    // 2. Primary path: read each page's embedded text layer. Fast (no model),
+    // and prose comes out verbatim — no OCR hallucination possible.
+    stage = 'extract';
+    progress.message('Reading the PDF’s text layer…', '');
+    const mmdPages = new Array(total).fill('');
+    const needNougat = [];
     for (let i = 1; i <= total; i++) {
-      const imageData = await renderPageToImageData(pdf, i);
-      const mmd = await convertPageInWorker(i, total, imageData);
-      mmdPages.push(mmd);
-      progress.pageDone();
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const fontNames = await resolveFontNames(page, textContent);
+      const res = extractPageMmd(textContent, { fontNames, pageIndex: i - 1 });
+      if (res.hasText && res.confidence >= TL_CONFIDENCE_MIN) {
+        mmdPages[i - 1] = res.mmd;
+      } else {
+        needNougat.push(i); // scanned page or math too stacked to linearize
+      }
+    }
+
+    // 3. Fallback: Nougat, only for the pages that need it. The model loads
+    // lazily — a clean text-layer document never downloads it at all.
+    if (needNougat.length) {
+      stage = 'model';
+      await loadModelOnce();
+      stage = 'convert';
+      progress.startConversion(needNougat.length);
+      for (const i of needNougat) {
+        const imageData = await renderPageToImageData(pdf, i);
+        const mmd = await convertPageInWorker(i, total, imageData);
+        mmdPages[i - 1] = mmd;
+        progress.pageDone();
+      }
+    } else {
+      els.deviceBadge.textContent = 'Direct text extraction (no AI model needed)';
+      els.deviceBadge.style.display = 'inline-block';
     }
 
     // 4. Fidelity lint: invented control sequences (\begindagger…) mean a span
@@ -206,9 +237,12 @@ async function convert(file) {
     });
     await showResult(text, file.name, segments, pdf);
   } catch (err) {
-    const where = { model: 'loading the model', pdf: 'reading the PDF', convert: 'converting a page' }[
-      stage
-    ];
+    const where = {
+      model: 'loading the model',
+      pdf: 'reading the PDF',
+      extract: 'extracting the text layer',
+      convert: 'converting a page',
+    }[stage];
     fail(`Failed while ${where}: ${err?.message || String(err)}`);
   } finally {
     setBusy(false);

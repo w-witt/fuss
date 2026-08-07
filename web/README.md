@@ -5,11 +5,19 @@ PDF to plain, speakable text **entirely on the visitor's machine** — the PDF i
 never uploaded anywhere.
 
 ```text
-PDF ──(pdf.js, rasterize pages)──▶ page images
-    ──(Web Worker: Nougat via transformers.js, WebGPU→WASM)──▶ LaTeX / Mathpix-Markdown
+PDF ──(textlayer.js: embedded text + math reconstruction)──▶ LaTeX / Mathpix-Markdown   ← primary
+    ╰─(pdf.js rasterize → Web Worker: Nougat, WebGPU→WASM)──▶ per-page fallback when the
+                                                              text layer can't be linearized
     ──(latex2text.js: port of pipeline/replacements.py)──▶ plain text (math read as words)
     ──(tts.js: Web Speech API)──▶ spoken audiobook with word-by-word read-along
 ```
+
+Born-digital PDFs are read straight from their text layer: prose is verbatim
+(no OCR hallucination), inline math is rebuilt from glyph geometry (scripts by
+baseline offset, symbols by Unicode, variables by TeX font). Each page gets a
+confidence score; pages the extractor can't linearize (stacked fractions,
+scanned pages) fall back to Nougat, and the model only downloads if such a
+page exists.
 
 ## Files
 
@@ -17,6 +25,7 @@ PDF ──(pdf.js, rasterize pages)──▶ page images
 | --- | --- |
 | `index.html` | Landing page + converter UI |
 | `app.js` | Orchestration: rasterize → worker → library, drives the progress bar |
+| `textlayer.js` | Primary converter: PDF text layer → MMD, per-page confidence |
 | `worker.js` | Runs `Xenova/nougat-small` off the main thread (WebGPU, WASM fallback) |
 | `gate.js` | Invite-code gate for the private beta (`gen-code.mjs` makes codes) |
 | `about.js` | "Why 'Fuss'?" history modal (Nikolaus Fuss, Euler's scribe) |
