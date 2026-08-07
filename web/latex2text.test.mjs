@@ -81,6 +81,13 @@ eq(
   dedupeRepeats('First claim here. Second different claim. Third one too.'),
   'First claim here. Second different claim. Third one too.'
 );
+// A non-consecutive repeat of a substantial sentence within one block is a
+// loop artifact: it speaks once.
+eq(
+  'separated repeat capped at one',
+  dedupeRepeats('The group G is a finite representation. Some other text. The group G is a finite representation.'),
+  'The group G is a finite representation. Some other text.'
+);
 eq('short text untouched', dedupeRepeats('Just one sentence.'), 'Just one sentence.');
 
 // --- preprocessMmd -----------------------------------------------------------

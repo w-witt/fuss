@@ -300,9 +300,10 @@ export function applyTextRules(text) {
  * Crop Nougat's repetition loops. The small model often degenerates into the
  * same sentence repeated many times (sometimes with tiny variations that slip
  * past token-level no_repeat_ngram). This collapses consecutive duplicate
- * sentences and caps any substantial sentence at two occurrences — mirroring,
- * in post-processing, the repetition stopper the upstream library applies
- * during generation.
+ * sentences and caps any substantial sentence at ONE occurrence per block —
+ * within a single paragraph, an identical ≥4-word sentence appearing again is
+ * a generation loop, not prose. (Legitimate restatements, e.g. a theorem
+ * repeated before its proof, live in separate blocks and are unaffected.)
  */
 export function dedupeRepeats(text) {
   if (!text) return text;
@@ -329,7 +330,7 @@ export function dedupeRepeats(text) {
     const count = (seen.get(key) || 0) + 1;
     seen.set(key, count);
     if (key === prevKey) continue; // collapse a run of identical sentences
-    if (wordCount >= 4 && count > 2) continue; // cap a long sentence at 2 total
+    if (wordCount >= 4 && count > 1) continue; // a long sentence speaks once per block
     prevKey = key;
     out.push(u);
   }
