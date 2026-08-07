@@ -26,7 +26,7 @@ from pipeline.replacements import text_replacements, math_replacements
 class TextSegment:
     text: str           # Speakable text for TTS
     source_text: str    # Display text (original, lightly cleaned)
-    segment_type: str   # "heading", "paragraph", "math_block", "pause"
+    segment_type: str   # "heading", "paragraph", "math_block", "pause", "footnote"
     index: int = 0      # Segment index, set during processing
 
 
@@ -78,6 +78,11 @@ def process_mmd(mmd_content: str) -> List[TextSegment]:
 
     # Strip likely author lines between title and abstract
     segments = _strip_author_lines(segments)
+
+    # Drop metadata footnotes (keywords, MSC codes, funding), then move real
+    # footnotes out of the mid-page reading flow
+    segments = _strip_metadata_footnotes(segments)
+    segments = _relocate_footnotes(segments)
 
     # Assign indices
     for i, seg in enumerate(segments):
@@ -176,6 +181,139 @@ def _apply_text_rules(text: str) -> str:
     for pattern, replacement in text_replacements:
         text = re.sub(pattern, replacement, text)
     return text
+
+
+# Journal classes (amsart etc.) render \thanks{}, \keywords{}, \subjclass{}
+# as unnumbered footnotes at the bottom of page 1. Nougat transcribes the page
+# in layout order, so that metadata lands mid-stream — typically right after
+# the abstract — and gets read aloud. It's metadata, never referenced from a
+# sentence, so it is stripped from the spoken stream entirely.
+
+_METADATA_FOOTNOTE_RES = [
+    re.compile(r'^key\s?words?( and phrases)?\s*[.:;—–-]', re.I),
+    re.compile(r'^index terms\s*[.:;—–-]', re.I),
+    re.compile(r'^ccs concepts\s*[.:;—–-]', re.I),
+    re.compile(r'^(\d{4}\s+)?mathematics subject classifications?\b', re.I),
+    re.compile(r'^msc( ?\(?\d{4}\)?)?\s*[.:;]', re.I),
+    re.compile(
+        r'^(this (work|research|study|project|material)'
+        r'|the (first |second |third |corresponding )?authors?(\'s work)?) '
+        r'(is|are|was|were|has been|have been)\b.{0,40}\b(supported|funded|financed)\b',
+        re.I,
+    ),
+    re.compile(r'^(partially |gratefully )?(supported|funded) (in part )?by\b', re.I),
+    re.compile(r'^funding\s*[.:;]', re.I),
+    re.compile(r'^e-?mail address(es)?\s*[.:;]', re.I),
+]
+
+# Keywords/MSC glued onto the end of a real paragraph (Nougat sometimes merges
+# the last prose block with the page-bottom footnotes). These clauses run to
+# the end of the block, so truncating at the marker is safe.
+_METADATA_TAIL_RE = re.compile(
+    r'\s(?:key\s?words?(?: and phrases)?\s*[.:;]'
+    r'|(?:\d{4}\s+)?mathematics subject classifications?\s*[.:;]'
+    r'|index terms\s*[—–.:;-]'
+    r'|ccs concepts\s*[.:;])',
+    re.I,
+)
+
+
+def _strip_metadata_footnotes(segments: List[TextSegment]) -> List[TextSegment]:
+    """Drop keywords / MSC codes / funding-acknowledgment footnotes."""
+    keep = []
+    for seg in segments:
+        if seg.segment_type != 'paragraph':
+            keep.append(seg)
+            continue
+        def is_metadata(t):
+            return len(t) < 600 and any(r.match(t) for r in _METADATA_FOOTNOTE_RES)
+
+        text = seg.text
+        if is_metadata(text):
+            continue
+        tail = _METADATA_TAIL_RE.search(text)
+        if tail and tail.start() > 0:
+            text = text[:tail.start()].strip()
+            src_tail = _METADATA_TAIL_RE.search(seg.source_text)
+            if src_tail and src_tail.start() > 0:
+                seg.source_text = seg.source_text[:src_tail.start()].strip()
+            seg.text = text
+        # What's left may itself be metadata (a merged thanks+keywords block).
+        if not text or is_metadata(text):
+            continue
+        keep.append(seg)
+    return keep
+
+
+# A real footnote definition: Nougat's "Footnote 1: ..." / "Footnote †: ..."
+# style, or a paragraph opening with a footnote symbol. Bare leading numbers
+# are deliberately NOT treated as footnotes — too many false positives
+# (enumerations, equation tags).
+_FOOTNOTE_DEF_RE = re.compile(
+    r'^(?:footnote\s*(\d{1,3}|[*†‡§¶])?\s*[.:]\s+|([†‡§¶])\s*[.:]?\s*)', re.I
+)
+
+
+def _find_footnote_ref(segments: List[TextSegment], marker: str, before: int) -> int:
+    """Index of the segment carrying the in-text reference to `marker`, or -1."""
+    if not marker or marker == '*':
+        return -1
+    is_num = marker.isdigit()
+    explicit = re.compile(r'\bfootnote\s+%s\b' % marker, re.I) if is_num else None
+    # A superscript marker survives Nougat as a digit glued to the preceding
+    # word or punctuation, e.g. "as shown.3" — match that, but not decimals
+    # ("3.5") or longer numbers ("x12" when looking for 1).
+    glued = (
+        re.compile(r'(?<![0-9])[a-zA-Z.,)\]”"\']%s(?=[\s.,;:!?)\]]|$)' % marker)
+        if is_num else None
+    )
+    for i in range(before - 1, -1, -1):
+        text = segments[i].text
+        if is_num:
+            if explicit.search(text) or glued.search(text):
+                return i
+        elif marker in text:
+            return i
+    return -1
+
+
+def _relocate_footnotes(segments: List[TextSegment]) -> List[TextSegment]:
+    """Move footnote paragraphs out of the mid-page reading flow.
+
+    If the in-text reference can be found, the footnote is spoken right after
+    the segment that cites it ("Footnote 1: ... End of footnote."); otherwise
+    it is deferred to the end of its section (before the next heading) so it
+    never interrupts a sentence mid-thought.
+    """
+    rest: List[TextSegment] = []
+    defs = []  # (index in rest where the def sat, marker, body, segment)
+    for seg in segments:
+        m = _FOOTNOTE_DEF_RE.match(seg.text) if seg.segment_type == 'paragraph' else None
+        if not m:
+            rest.append(seg)
+            continue
+        body = seg.text[m.end():].strip()
+        if not body:
+            continue  # marker with no content — nothing to speak
+        defs.append((len(rest), m.group(1) or m.group(2) or '', body, seg))
+
+    # Insert back-to-front so earlier insertions don't shift later positions.
+    for at, marker, body, seg in reversed(defs):
+        label = ' %s' % marker if marker and marker != '*' else ''
+        seg.text = 'Footnote%s: %s End of footnote.' % (label, body)
+        seg.segment_type = 'footnote'
+
+        ref_idx = _find_footnote_ref(rest, marker, at)
+        if ref_idx >= 0:
+            insert_at = ref_idx + 1
+        else:
+            insert_at = len(rest)
+            for i in range(at, len(rest)):
+                if rest[i].segment_type == 'heading':
+                    insert_at = i
+                    break
+        rest.insert(insert_at, seg)
+    return rest
 
 
 def _strip_author_lines(segments: List[TextSegment]) -> List[TextSegment]:

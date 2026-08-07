@@ -8,6 +8,8 @@ import {
   preprocessMmd,
   speakMathSpans,
   dedupeRepeats,
+  stripMetadataFootnotes,
+  relocateFootnotes,
 } from './latex2text.js';
 import { lintMmd, lintLooksBad } from './mmdlint.js';
 
@@ -104,6 +106,123 @@ eq(
   speakMathSpans('let $x \\leq y$ hold').replace(/\s+/g, ' ').trim(),
   'let x less than or equal to y hold'
 );
+
+// --- stripMetadataFootnotes ---------------------------------------------------
+{
+  const seg = (text, segment_type = 'paragraph') => ({
+    text,
+    source_text: text,
+    segment_type,
+    index: 0,
+  });
+  const texts = (segs) => segs.map((s) => s.text);
+
+  // The Sample PDF case: amsart front-matter footnotes land after the abstract.
+  const out = stripMetadataFootnotes([
+    seg('Abstract.', 'heading'),
+    seg('We prove that a certain representation is not faithful.'),
+    seg(
+      'The author is supported by KIAS Individual Grant HP094701 at Korea Institute for Advanced Study.'
+    ),
+    seg('Key words and phrases. Baumslag-Gersten group; representation by functions.'),
+    seg('2020 Mathematics Subject Classification. 20F05 (primary); 20F38 (secondary).'),
+    seg('Let B be the Baumslag-Gersten group.'),
+  ]);
+  eq('metadata footnotes dropped', texts(out).join(' | '), [
+    'Abstract.',
+    'We prove that a certain representation is not faithful.',
+    'Let B be the Baumslag-Gersten group.',
+  ].join(' | '));
+
+  // Keywords glued onto real prose: truncate, keep the prose.
+  const merged = stripMetadataFootnotes([
+    seg('This gives a negative answer to a problem of Olshanskii. Key words and phrases. groups; functions.'),
+  ]);
+  eq(
+    'glued keywords truncated',
+    texts(merged).join(''),
+    'This gives a negative answer to a problem of Olshanskii.'
+  );
+
+  // Real prose about support must survive.
+  const prose = stripMetadataFootnotes([
+    seg('The claim is supported by the numerical evidence in Section 4.'),
+  ]);
+  eq('prose about support kept', prose.length, 1);
+}
+
+// --- relocateFootnotes --------------------------------------------------------
+{
+  const seg = (text, segment_type = 'paragraph') => ({
+    text,
+    source_text: text,
+    segment_type,
+    index: 0,
+  });
+  const texts = (segs) => segs.map((s) => s.text);
+
+  // Referenced footnote splices in right after the citing segment.
+  const spliced = relocateFootnotes([
+    seg('Introduction', 'heading'),
+    seg('The result was first observed by Gersten.1 It was later refined.'),
+    seg('A second paragraph of prose.'),
+    seg('Footnote 1: See the 1992 preprint for the original argument.'),
+    seg('Closing paragraph.'),
+  ]);
+  eq('footnote spliced after reference', texts(spliced).join(' | '), [
+    'Introduction',
+    'The result was first observed by Gersten.1 It was later refined.',
+    'Footnote 1: See the 1992 preprint for the original argument. End of footnote.',
+    'A second paragraph of prose.',
+    'Closing paragraph.',
+  ].join(' | '));
+  eq('spliced footnote typed', spliced[2].segment_type, 'footnote');
+
+  // Unreferenced footnote defers to the end of its section.
+  const deferred = relocateFootnotes([
+    seg('Mid-page sentence one.'),
+    seg('Footnote 2: An aside nobody visibly cites.'),
+    seg('Mid-page sentence two.'),
+    seg('Next Section', 'heading'),
+    seg('Next section prose.'),
+  ]);
+  eq('unreferenced footnote deferred to section end', texts(deferred).join(' | '), [
+    'Mid-page sentence one.',
+    'Mid-page sentence two.',
+    'Footnote 2: An aside nobody visibly cites. End of footnote.',
+    'Next Section',
+    'Next section prose.',
+  ].join(' | '));
+
+  // Dagger-marked footnote block, referenced by symbol.
+  const dagger = relocateFootnotes([
+    seg('The construction† follows the standard pattern.'),
+    seg('More prose here.'),
+    seg('† Due to Higman, in the countable case.'),
+  ]);
+  eq('dagger footnote spliced', texts(dagger).join(' | '), [
+    'The construction† follows the standard pattern.',
+    'Footnote †: Due to Higman, in the countable case. End of footnote.',
+    'More prose here.',
+  ].join(' | '));
+
+  // A decimal like "3.5" must not count as a reference to footnote 5.
+  const decimal = relocateFootnotes([
+    seg('The constant is 3.5 in this regime.'),
+    seg('Later prose.'),
+    seg('Footnote 5: A genuinely unreferenced note.'),
+  ]);
+  eq(
+    'decimal not a footnote ref',
+    texts(decimal)[2],
+    'Footnote 5: A genuinely unreferenced note. End of footnote.'
+  );
+
+  // Enumerated prose ("1. First do X") is not footnote-ish: bare numbers alone
+  // never match, so nothing moves.
+  const enumd = relocateFootnotes([seg('1) First do the reduction step.')]);
+  eq('enumeration untouched', texts(enumd)[0], '1) First do the reduction step.');
+}
 
 // --- mmdlint (fidelity linter) ------------------------------------------------
 {

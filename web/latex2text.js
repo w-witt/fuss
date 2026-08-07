@@ -426,6 +426,131 @@ function stripAuthorLines(segments) {
   return keep;
 }
 
+// ---------------------------------------------------------------------------
+// Footnote handling
+// ---------------------------------------------------------------------------
+//
+// Journal classes (amsart etc.) render \thanks{}, \keywords{}, \subjclass{}
+// as unnumbered footnotes at the bottom of page 1. Nougat transcribes the page
+// in layout order, so that metadata lands mid-stream — typically right after
+// the abstract — and gets read aloud. It's metadata, never referenced from a
+// sentence, so it is stripped from the spoken stream entirely.
+
+// A paragraph that IS a metadata footnote (matched against its start).
+const metadataFootnoteRes = [
+  /^key\s?words?( and phrases)?\s*[.:;—–-]/i,
+  /^index terms\s*[.:;—–-]/i,
+  /^ccs concepts\s*[.:;—–-]/i,
+  /^(\d{4}\s+)?mathematics subject classifications?\b/i,
+  /^msc( ?\(?\d{4}\)?)?\s*[.:;]/i,
+  /^(this (work|research|study|project|material)|the (first |second |third |corresponding )?authors?('s work)?) (is|are|was|were|has been|have been)\b.{0,40}\b(supported|funded|financed)\b/i,
+  /^(partially |gratefully )?(supported|funded) (in part )?by\b/i,
+  /^funding\s*[.:;]/i,
+  /^e-?mail address(es)?\s*[.:;]/i,
+];
+
+// Keywords/MSC glued onto the end of a real paragraph (Nougat sometimes merges
+// the last prose block with the page-bottom footnotes). These clauses run to
+// the end of the block, so truncating at the marker is safe.
+const metadataTailRe =
+  /\s(?:key\s?words?(?: and phrases)?\s*[.:;]|(?:\d{4}\s+)?mathematics subject classifications?\s*[.:;]|index terms\s*[—–.:;-]|ccs concepts\s*[.:;])/i;
+
+/** Drop keywords / MSC codes / funding-acknowledgment footnotes. */
+export function stripMetadataFootnotes(segments) {
+  const keep = [];
+  for (const seg of segments) {
+    if (seg.segment_type !== 'paragraph') {
+      keep.push(seg);
+      continue;
+    }
+    const isMetadata = (t) => t.length < 600 && metadataFootnoteRes.some((re) => re.test(t));
+    let text = seg.text;
+    if (isMetadata(text)) continue;
+    const tail = text.match(metadataTailRe);
+    if (tail && tail.index > 0) {
+      text = text.slice(0, tail.index).trim();
+      const srcTail = seg.source_text.match(metadataTailRe);
+      if (srcTail && srcTail.index > 0) {
+        seg.source_text = seg.source_text.slice(0, srcTail.index).trim();
+      }
+      seg.text = text;
+    }
+    // What's left may itself be metadata (a merged thanks+keywords block).
+    if (!text || isMetadata(text)) continue;
+    keep.push(seg);
+  }
+  return keep;
+}
+
+// A real footnote definition: Nougat's "Footnote 1: ..." / "Footnote †: ..."
+// style, or a paragraph opening with a footnote symbol. Bare leading numbers
+// are deliberately NOT treated as footnotes — too many false positives
+// (enumerations, equation tags).
+const footnoteDefRe = /^(?:footnote\s*(\d{1,3}|[*†‡§¶])?\s*[.:]\s+|([†‡§¶])\s*[.:]?\s*)/i;
+
+/** Where the in-text reference to footnote `marker` is, or -1. */
+function findFootnoteRef(segments, marker, before) {
+  if (!marker || marker === '*') return -1;
+  const isNum = /^\d+$/.test(marker);
+  const explicit = isNum ? new RegExp(`\\bfootnote\\s+${marker}\\b`, 'i') : null;
+  // A superscript marker survives Nougat as a digit glued to the preceding
+  // word or punctuation, e.g. "as shown.3" — match that, but not decimals
+  // ("3.5") or longer numbers ("x12" when looking for 1).
+  const glued = isNum
+    ? new RegExp(`(?<![0-9])[a-zA-Z.,)\\]”"']${marker}(?=[\\s.,;:!?)\\]]|$)`)
+    : null;
+  for (let i = before - 1; i >= 0; i--) {
+    const text = segments[i].text;
+    if (isNum ? explicit.test(text) || glued.test(text) : text.includes(marker)) return i;
+  }
+  return -1;
+}
+
+/**
+ * Move footnote paragraphs out of the mid-page reading flow. If the in-text
+ * reference can be found, the footnote is spoken right after the segment that
+ * cites it ("Footnote 1: … End of footnote."); otherwise it is deferred to the
+ * end of its section (before the next heading) so it never interrupts a
+ * sentence mid-thought.
+ */
+export function relocateFootnotes(segments) {
+  const rest = [];
+  const defs = []; // { at: index in rest where the def sat, marker, body, seg }
+  for (const seg of segments) {
+    const m = seg.segment_type === 'paragraph' ? seg.text.match(footnoteDefRe) : null;
+    if (!m) {
+      rest.push(seg);
+      continue;
+    }
+    const body = seg.text.slice(m[0].length).trim();
+    if (!body) continue; // marker with no content — nothing to speak
+    defs.push({ at: rest.length, marker: m[1] || m[2] || '', body, seg });
+  }
+  // Insert back-to-front so earlier insertions don't shift later positions.
+  for (let d = defs.length - 1; d >= 0; d--) {
+    const { at, marker, body, seg } = defs[d];
+    const label = marker && marker !== '*' ? ` ${marker}` : '';
+    seg.text = `Footnote${label}: ${body} End of footnote.`;
+    seg.segment_type = 'footnote';
+
+    const refIdx = findFootnoteRef(rest, marker, at);
+    let insertAt;
+    if (refIdx >= 0) {
+      insertAt = refIdx + 1;
+    } else {
+      insertAt = rest.length;
+      for (let i = at; i < rest.length; i++) {
+        if (rest[i].segment_type === 'heading') {
+          insertAt = i;
+          break;
+        }
+      }
+    }
+    rest.splice(insertAt, 0, seg);
+  }
+  return rest;
+}
+
 /**
  * Convert Mathpix Markdown into ordered speakable segments. Mirrors process_mmd.
  *
@@ -466,8 +591,10 @@ export function processMmd(mmd, { renderMarkdown, parseHtml }) {
 
   const deduped = dedupeSegments(segments); // catch loops split across paragraphs
   const stripped = stripAuthorLines(deduped);
-  stripped.forEach((seg, i) => (seg.index = i));
-  return stripped;
+  const noMeta = stripMetadataFootnotes(stripped);
+  const relocated = relocateFootnotes(noMeta);
+  relocated.forEach((seg, i) => (seg.index = i));
+  return relocated;
 }
 
 /** Drop consecutive duplicate segments and cap repeated segments. */
