@@ -37,7 +37,8 @@ const FONTS = { f_mi: 'ABCDEF+CMMI10', f_sy: 'ABCDEF+CMSY7', f_text: 'ABCDEF+CMR
     ]),
     { fontNames: FONTS }
   );
-  check('exponent merges into ^{-1}', /bab\^\{\s?-\s?1\}/.test(res.mmd), res.mmd);
+  // math-italic letters separate (b a b, not the syllable "bab")
+  check('exponent merges into ^{-1}', /b a b\s?\^\{\s?-\s?1\}/.test(res.mmd), res.mmd);
   check('exponent stays in one math span', !/\^\{[^}]*\\\(/.test(res.mmd), res.mmd);
 }
 

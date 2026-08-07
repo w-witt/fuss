@@ -73,6 +73,12 @@ function isMathCodepoint(cp) {
 // TeX / OpenType math font PostScript names ("ABCDEF+CMMI10" → math italic).
 const MATH_FONT_RE = /CMMI|CMSY|CMEX|CMBSY|MSAM|MSBM|EUSM|RSFS|Math|Symbol/i;
 
+// Math-ITALIC fonts specifically: a letter run in these ("bab") is juxtaposed
+// single-letter variables, not a word — TeX sets multi-letter operator names
+// (log, det, …) in roman, never math italic. Spoken, the letters must be
+// separated ("b a b"), or the TTS reads "bab" as one syllable.
+const MATH_ITALIC_FONT_RE = /CMMI|MI\d|[rt]?txmi|Math-?Italic|MathItalic/i;
+
 // --- geometry helpers ------------------------------------------------------
 
 function itemSize(it) {
@@ -193,6 +199,7 @@ function lineToText(line, fontPs) {
     const level = size >= line.size * 0.82 ? 0 : size >= line.size * 0.55 ? 1 : 2;
     const ps = fontPs[it.fontName] || '';
     const mathFont = MATH_FONT_RE.test(ps);
+    const mathItalic = MATH_ITALIC_FONT_RE.test(ps);
 
     const gap = prevEnd === null ? 0 : itemX(it) - prevEnd;
     const space = prevEnd !== null && gap > size * 0.15;
@@ -211,10 +218,15 @@ function lineToText(line, fontPs) {
         text += ` ${GREEK_TO_LATEX[ch]} `;
         itemMath = true;
         mathChars++;
+      } else if (mathItalic && /[A-Za-z]/.test(ch)) {
+        // Juxtaposed math-italic variables: separate so "bab" speaks b a b.
+        text += ch + ' ';
+        mathChars++;
       } else {
         const folded = foldMathAlnum(cp);
         if (folded !== null) {
-          text += folded;
+          // Mathematical Alphanumeric letters are individual symbols too.
+          text += /[A-Za-z]/.test(folded) ? folded + ' ' : folded;
           itemMath = true;
           mathChars++;
         } else if (isMathCodepoint(cp) || cp === 0xfffd) {
