@@ -60,6 +60,9 @@ export const textReplacements = [
   [/\s*(\b\w+\s+et al\.) (\[\d{4}\]|\(\d{4}\))/g, '$1'],
   // remove urls
   [/\s*https?:\/\/[\w/:%#$&?()~.=+\-]*[\w\d_\-]/g, ''],
+  // empty brackets left by removed citations / lost equation-tag symbols
+  [/\s*\(\s*\)/g, ''],
+  [/\s*\[\s*\]/g, ''],
   // remove new lines
   [/\n/g, ''],
 ];
@@ -102,6 +105,8 @@ export const mathReplacements = [
   // Logarithmic and exponential functions (subscripted base first)
   [/\\log_\{([^}]+)\}/g, 'log base $1 of'],
   [/\\log_(\w)/g, 'log base $1 of'],
+  // same, for "log" arriving as plain text (PDF text layer, not a command)
+  [/\blog_\{([^}]+)\}/g, 'log base $1 of'],
   [/\\ln/g, 'natural log of'],
   [/\\log/g, 'log of'],
   [/\\exp/g, 'e to the'],
@@ -556,6 +561,26 @@ export function relocateFootnotes(segments) {
 }
 
 /**
+ * Drop the bibliography from the spoken stream: a references section read
+ * aloud entry-by-entry is noise for a listener (inline citations are already
+ * silenced). Skips from a References/Bibliography heading to the next heading
+ * (protecting a following appendix) or the end — which also sweeps the
+ * trailing amsart address block that follows the references.
+ */
+export function stripBibliography(segments) {
+  const out = [];
+  let skipping = false;
+  for (const seg of segments) {
+    if (seg.segment_type === 'heading') {
+      skipping = /^(references|bibliography)\b/i.test(seg.text.trim());
+      if (skipping) continue;
+    }
+    if (!skipping) out.push(seg);
+  }
+  return out;
+}
+
+/**
  * Convert Mathpix Markdown into ordered speakable segments. Mirrors process_mmd.
  *
  * @param {string} mmd            raw Nougat output
@@ -597,8 +622,9 @@ export function processMmd(mmd, { renderMarkdown, parseHtml }) {
   const stripped = stripAuthorLines(deduped);
   const noMeta = stripMetadataFootnotes(stripped);
   const relocated = relocateFootnotes(noMeta);
-  relocated.forEach((seg, i) => (seg.index = i));
-  return relocated;
+  const noBib = stripBibliography(relocated);
+  noBib.forEach((seg, i) => (seg.index = i));
+  return noBib;
 }
 
 /** Drop consecutive duplicate segments and cap repeated segments. */

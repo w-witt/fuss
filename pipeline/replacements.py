@@ -36,6 +36,9 @@ text_replacements = [
     (r'\s*(\b\w+\s+et al\.) (\[\d{4}\]|\(\d{4}\))', r'\1'),
     # remove urls
     (r'\s*https?://[\w/:%#\$&\?\(\)~\.=\+\-]*[\w\d_\-]', ''),
+    # empty brackets left by removed citations / lost equation-tag symbols
+    (r'\s*\(\s*\)', ''),
+    (r'\s*\[\s*\]', ''),
     # remove new lines
     (r'\n', ''),
 ]
@@ -74,6 +77,10 @@ math_replacements = [
     (r'\\sqrt\[(\d+)]{([^}]+)}', r'\1-th root of \2'),
 
     # Logarithmic and exponential functions
+    (r'\\log_\{([^}]+)\}', r'log base \1 of'),
+    (r'\\log_(\w)', r'log base \1 of'),
+    # same, for "log" arriving as plain text (PDF text layer, not a command)
+    (r'\blog_\{([^}]+)\}', r'log base \1 of'),
     (r'\\ln', 'natural log of'),
     (r'\\log', 'log of'),
     (r'\\exp', 'e to the'),

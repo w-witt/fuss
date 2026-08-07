@@ -397,9 +397,18 @@ function lineToText(line, fontPs) {
     const script = tok.text.trim();
     if (!script) continue;
     if (!inMath && stack.length === 0) {
-      if (/^\d{1,3}$/.test(script) && !tok.math) {
-        // A small raised digit after prose is a footnote marker — keep it
-        // glued ("word.3") so relocateFootnotes can find the reference.
+      // A small RAISED digit right after prose (a word or its punctuation) is
+      // a footnote marker — keep it glued ("word.3") so relocateFootnotes can
+      // find the reference. Lowered digits are subscripts (log_2), and a digit
+      // following another digit is an exponent (2^2) — both take the script
+      // path below.
+      const prevChar = out.replace(/\s+$/, '').slice(-1);
+      if (
+        /^\d{1,3}$/.test(script) &&
+        !tok.math &&
+        tok.y > levelY[0] &&
+        /[a-zA-Z.,;:)\]!?'’”]/.test(prevChar)
+      ) {
         out = out.replace(/\s+$/, '') + script;
         continue;
       }
@@ -577,9 +586,14 @@ export function extractPageMmd(textContent, opts = {}) {
     const gap = prev ? prev.y - r.y : Infinity;
     const indented = prev && r.x0 - prev.x0 > body * 0.8 && prev.x1 - prev.x0 > body * 4;
     const sizeBreak = prev && Math.abs(r.size - prev.size) > body * 0.2;
-    if (!cur || gap > medGap * 1.45 || indented || sizeBreak) {
-      cur = { lines: [r], size: r.size };
+    // Section words set at body size (amsart small-caps "References") won't
+    // trip the size heuristics — force them into their own heading block so
+    // the bibliography is a strippable section downstream.
+    const sectionWord = /^(references|bibliography|acknowledge?ments?)\s*\.?\s*$/i.test(r.text);
+    if (!cur || gap > medGap * 1.45 || indented || sizeBreak || sectionWord) {
+      cur = { lines: [r], size: r.size, forceHeading: sectionWord };
       paras.push(cur);
+      if (sectionWord) cur = null; // next line starts a fresh block
     } else {
       cur.lines.push(r);
     }
@@ -600,7 +614,7 @@ export function extractPageMmd(textContent, opts = {}) {
       p.size >= body * 1.14 && p.lines.length <= 3 && text.length < 120 && !/[.]\s/.test(text);
     const isNumberedHeading =
       /^\d+(\.\d+)*\.?\s+[A-Z][A-Za-z]/.test(text) && text.length < 90 && p.lines.length === 1;
-    if (isHeading || isNumberedHeading) {
+    if (isHeading || isNumberedHeading || p.forceHeading) {
       blocks.push(`## ${text}`);
     } else {
       blocks.push(text);

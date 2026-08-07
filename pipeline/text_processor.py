@@ -80,9 +80,10 @@ def process_mmd(mmd_content: str) -> List[TextSegment]:
     segments = _strip_author_lines(segments)
 
     # Drop metadata footnotes (keywords, MSC codes, funding), then move real
-    # footnotes out of the mid-page reading flow
+    # footnotes out of the mid-page reading flow, then drop the bibliography
     segments = _strip_metadata_footnotes(segments)
     segments = _relocate_footnotes(segments)
+    segments = _strip_bibliography(segments)
 
     # Assign indices
     for i, seg in enumerate(segments):
@@ -315,6 +316,26 @@ def _relocate_footnotes(segments: List[TextSegment]) -> List[TextSegment]:
                     break
         rest.insert(insert_at, seg)
     return rest
+
+
+def _strip_bibliography(segments: List[TextSegment]) -> List[TextSegment]:
+    """Drop the bibliography from the spoken stream.
+
+    A references section read aloud entry-by-entry is noise for a listener
+    (inline citations are already silenced). Skips from a References/
+    Bibliography heading to the next heading (protecting a following
+    appendix) or the end.
+    """
+    out = []
+    skipping = False
+    for seg in segments:
+        if seg.segment_type == 'heading':
+            skipping = bool(re.match(r'(references|bibliography)\b', seg.text.strip(), re.I))
+            if skipping:
+                continue
+        if not skipping:
+            out.append(seg)
+    return out
 
 
 def _strip_author_lines(segments: List[TextSegment]) -> List[TextSegment]:
