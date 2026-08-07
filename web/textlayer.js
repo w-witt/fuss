@@ -219,6 +219,48 @@ function normalizeTexGlyphs(s) {
 // --- per-line reconstruction ----------------------------------------------
 
 /**
+ * An inline \frac reaches the text layer as two script-size glyphs stacked at
+ * the same x (numerator above the axis, denominator below) — read in glyph
+ * order they glue into nonsense ("(12, 0)" for (1/2, 0)). Fuse each such pair
+ * into a synthetic \frac{num}{den} item on the line's baseline, which
+ * latex2text speaks as "num over den". Only simple alphanumeric pairs fuse;
+ * anything richer stays as-is for the confidence penalty to judge.
+ */
+function fuseStackedFractions(items, line) {
+  for (let i = 0; i < items.length; i++) {
+    const a = items[i];
+    if (a.latex) continue;
+    const sa = itemSize(a);
+    if (sa > line.size * 0.78) continue;
+    for (let j = i + 1; j < items.length; j++) {
+      const b = items[j];
+      if (b.latex) continue;
+      const sb = itemSize(b);
+      if (sb > line.size * 0.78) continue;
+      const aw = a.width || sa;
+      const bw = b.width || sb;
+      const overlap = Math.min(itemX(a) + aw, itemX(b) + bw) - Math.max(itemX(a), itemX(b));
+      if (overlap < Math.min(aw, bw) * 0.5) continue;
+      const dy = itemY(a) - itemY(b);
+      if (Math.abs(dy) < line.size * 0.25 || Math.abs(dy) > line.size * 1.4) continue;
+      const [num, den] = dy > 0 ? [a, b] : [b, a];
+      const numS = num.str.trim();
+      const denS = den.str.trim();
+      if (!/^[A-Za-z0-9]{1,4}$/.test(numS) || !/^[A-Za-z0-9]{1,4}$/.test(denS)) continue;
+      items[i] = {
+        str: `${numS}/${denS}`,
+        latex: ` \\frac{${numS}}{${denS}} `,
+        transform: [line.size, 0, 0, line.size, Math.min(itemX(a), itemX(b)), line.y],
+        width: Math.max(aw, bw),
+        fontName: a.fontName,
+      };
+      items.splice(j, 1);
+      break;
+    }
+  }
+}
+
+/**
  * Convert one visual line into text, wrapping recognized math runs in \( \).
  *
  * Scripts are handled by LEVEL: a full-size item is level 0, a first-level
@@ -245,6 +287,7 @@ function lineToText(line, fontPs) {
     }
     items.push(it);
   }
+  fuseStackedFractions(items, line);
 
   // Tokenize: map characters, classify math-ness and script level.
   const tokens = []; // { text, math, level, y, space }
@@ -261,6 +304,14 @@ function lineToText(line, fontPs) {
     const gap = prevEnd === null ? 0 : itemX(it) - prevEnd;
     const space = prevEnd !== null && gap > size * 0.15;
     prevEnd = itemX(it) + (it.width || 0);
+
+    if (it.latex) {
+      // Synthetic construct (fused fraction) — pre-built LaTeX, always math.
+      totalChars += it.str.length;
+      mathChars += it.str.length;
+      tokens.push({ text: it.latex, math: true, level: 0, y: itemY(it), space });
+      continue;
+    }
 
     let text = '';
     let itemMath = mathFont;

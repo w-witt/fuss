@@ -123,6 +123,21 @@ const FONTS = { f_mi: 'ABCDEF+CMMI10', f_sy: 'ABCDEF+CMSY7', f_text: 'ABCDEF+CMR
   check('no phantom exponent line', !/^2n/m.test(res.mmd), res.mmd);
 }
 
+// --- stacked script pair fuses into a fraction --------------------------------
+{
+  const res = extractPageMmd(
+    page([
+      it('maps to (', 50, 700, 10, 'f_text', 45),
+      it('1', 96, 703.9, 7, 'f_text', 4), // numerator, above the axis
+      it('2', 96, 696.6, 7, 'f_text', 4), // denominator, below — same x
+      it(', 0) as claimed.', 102, 700, 10, 'f_text', 80),
+    ]),
+    { fontNames: FONTS }
+  );
+  check('half fuses to \\frac{1}{2}', res.mmd.includes('\\frac{1}{2}'), res.mmd);
+  check('no glued 12', !/\b12\b/.test(res.mmd), res.mmd);
+}
+
 // --- empty / scanned page ----------------------------------------------------
 {
   const res = extractPageMmd(page([]), {});
