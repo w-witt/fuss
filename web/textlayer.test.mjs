@@ -106,6 +106,23 @@ const FONTS = { f_mi: 'ABCDEF+CMMI10', f_sy: 'ABCDEF+CMSY7', f_text: 'ABCDEF+CMR
   check('title promoted to heading', /^# A GREAT THEOREM/m.test(res.mmd), res.mmd);
 }
 
+// --- display-style exponent: raised beyond line tolerance, still attaches ----
+{
+  const res = extractPageMmd(
+    page([
+      it('C', 50, 700, 10, 'f_mi', 6),
+      it('=', 60, 700, 10, 'f_text', 5),
+      it('2', 70, 700, 10, 'f_text', 5),
+      it('2n', 76, 707, 7, 'f_mi', 7), // display superscript, 7pt above baseline
+      it('= x', 90, 700, 10, 'f_text', 15),
+      it('2', 106, 707, 7, 'f_text', 4),
+    ]),
+    { fontNames: FONTS }
+  );
+  check('display exponent attaches to base', /2\^\{\s?2\s?n\s?\}/.test(res.mmd), res.mmd);
+  check('no phantom exponent line', !/^2n/m.test(res.mmd), res.mmd);
+}
+
 // --- empty / scanned page ----------------------------------------------------
 {
   const res = extractPageMmd(page([]), {});

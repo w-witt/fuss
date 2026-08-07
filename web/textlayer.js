@@ -141,7 +141,64 @@ function groupLines(items, body) {
     l.y = itemY(main);
     l.size = itemSize(main);
   }
-  return lines;
+  reassignScriptItems(lines, body);
+  return lines.filter((l) => l.items.length);
+}
+
+/**
+ * Display-style scripts sit ~0.7em off the baseline — beyond the line
+ * grouping tolerance — so a display equation's exponents can cluster into a
+ * phantom "line" of their own (often together with the equation's radical
+ * glyphs) that reads before the bases. Fix at item granularity: every
+ * script-size glyph (TeX scriptsize ≤0.7×body; footnote text is ≥0.8× and
+ * unaffected) must live on a line that has full-size alphanumeric content
+ * (an anchor) with the item in its script window. Items that don't are moved
+ * to the nearest anchoring line whose x-span covers them, where the
+ * level/offset logic attaches them as ^{}/_{ } correctly.
+ */
+function reassignScriptItems(lines, body) {
+  const anchors = lines.filter(
+    (l) =>
+      l.size >= body * 0.9 &&
+      l.items.some((it) => itemSize(it) >= body * 0.9 && /[A-Za-z0-9]/.test(it.str))
+  );
+  const span = (l) => [
+    itemX(l.items[0]),
+    itemX(l.items[l.items.length - 1]) + (l.items[l.items.length - 1].width || 0),
+  ];
+  // superscripts hang up to ~1.05×body above an anchor baseline; subscripts
+  // up to ~0.6×body below
+  const inWindow = (y, n) => {
+    const dy = y - n.y;
+    return dy >= -body * 0.6 && dy <= body * 1.05;
+  };
+  for (const l of lines) {
+    const isAnchor = anchors.includes(l);
+    for (let k = l.items.length - 1; k >= 0; k--) {
+      const it = l.items[k];
+      if (itemSize(it) > body * 0.78) continue;
+      const y = itemY(it);
+      if (isAnchor && inWindow(y, l)) continue; // already attached correctly
+      let best = null;
+      let bestDy = Infinity;
+      for (const n of anchors) {
+        if (n === l || !inWindow(y, n)) continue;
+        const [b0, b1] = span(n);
+        const x = itemX(it);
+        if (x < b0 - body || x > b1 + body) continue;
+        const dy = Math.abs(y - n.y);
+        if (dy < bestDy) {
+          bestDy = dy;
+          best = n;
+        }
+      }
+      if (best) {
+        best.items.push(it);
+        l.items.splice(k, 1);
+      }
+    }
+  }
+  for (const l of lines) l.items.sort((a, b) => itemX(a) - itemX(b));
 }
 
 // TeX renders some symbols as multi-glyph compositions; the text layer sees
@@ -362,7 +419,26 @@ export function extractPageMmd(textContent, opts = {}) {
   if (!items.length) return { mmd: '', confidence: 0, mathRatio: 0, hasText: false };
 
   const body = bodyFontSize(items);
-  const lines = groupLines(items, body);
+  const allLines = groupLines(items, body);
+
+  // A line with no full-size alphanumeric content at its own dominant size is
+  // unanchored debris: radical bars plus script fragments the reassignment
+  // pass couldn't place (deep fraction stacks). Speaking it would be noise —
+  // drop it, but charge it to the page's confidence so equation-dense pages
+  // still fall back to Nougat.
+  let orphanChars = 0;
+  const lines = [];
+  for (const l of allLines) {
+    const anchored = l.items.some(
+      (it) => itemSize(it) >= l.size * 0.9 && /[A-Za-z0-9]/.test(it.str)
+    );
+    if (anchored) {
+      lines.push(l);
+    } else {
+      orphanChars += l.items.reduce((n, it) => n + it.str.trim().length, 0);
+    }
+  }
+  if (!lines.length) return { mmd: '', confidence: 0, mathRatio: 0, hasText: false };
 
   const pageTop = lines.length ? lines[0].y : 0;
   const pageBottom = lines.length ? lines[lines.length - 1].y : 0;
@@ -377,8 +453,17 @@ export function extractPageMmd(textContent, opts = {}) {
     if (!r.text) continue;
     // Orphan symbol debris (a radical's bar glyph on its own "line", stray
     // delimiters) has no alphanumeric content once commands are removed.
+    // A short digits-only line is the same thing — the upper deck of a
+    // stacked construct; real equation lines carry variable letters. Both
+    // stay out of the speech but count against the page's confidence.
     const spoken = r.text.replace(/\\[a-zA-Z]+/g, '').replace(/[\\(){}^_]/g, '');
-    if (!/[A-Za-z0-9]/.test(spoken)) continue;
+    if (
+      !/[A-Za-z0-9]/.test(spoken) ||
+      (!/[A-Za-z]/.test(spoken) && spoken.replace(/\s/g, '').length < 12)
+    ) {
+      orphanChars += r.totalChars;
+      continue;
+    }
     mathChars += r.mathChars;
     totalChars += r.totalChars;
     unknownMath += r.unknownMath;
@@ -485,6 +570,7 @@ export function extractPageMmd(textContent, opts = {}) {
   let confidence = 1;
   confidence -= Math.min(0.7, (stackedChars / Math.max(1, totalChars)) * 4);
   confidence -= Math.min(0.4, (unknownMath / Math.max(1, totalChars)) * 30);
+  confidence -= Math.min(0.3, (orphanChars / Math.max(1, totalChars + orphanChars)) * 4);
   confidence = Math.max(0, confidence);
 
   return {
