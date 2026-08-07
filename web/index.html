@@ -17,8 +17,9 @@
       <p class="tagline">Listen to math-heavy papers like an audiobook.</p>
       <p class="lede">
         Drop an academic PDF and Fuss reads it aloud — equations and all — with word-by-word
-        read-along. The Nougat model and the speech run on <strong>your own CPU/GPU</strong>; the
-        file never leaves your machine. <span class="beta-pill">Beta</span>
+        read-along. The text is read <strong>straight out of the PDF</strong> and everything runs on
+        <strong>your own machine</strong>; the file is never uploaded.
+        <span class="beta-pill">Beta</span>
       </p>
       <p class="hero-links"><a href="#" data-about-open>Why “Fuss”?</a></p>
     </header>
@@ -53,8 +54,9 @@
         </div>
 
         <p class="note">
-          First run downloads the model (~one time, then cached). For best speed use a browser with
-          WebGPU (Chrome or Edge). Big or scanned PDFs take longer on CPU.
+          Most papers convert in seconds with no download. Pages the extractor can’t linearize
+          (dense stacked equations, scans) use the Nougat model — downloaded once, then cached; a
+          browser with WebGPU (Chrome or Edge) makes that part much faster.
         </p>
       </section>
 
@@ -98,19 +100,31 @@
       <section class="panel how">
         <h2>How it works</h2>
         <ol>
-          <li><strong>Render</strong> — each PDF page is rasterized in your browser (pdf.js).</li>
           <li>
-            <strong>Recognize</strong> — the Nougat neural model reads each page into LaTeX/Markdown,
-            on your CPU or GPU.
+            <strong>Extract</strong> — the words are read directly from the PDF’s own text layer
+            (pdf.js), so the prose is exactly what the authors wrote — nothing is guessed or
+            re-recognized.
+          </li>
+          <li>
+            <strong>Rebuild the math</strong> — equations are reconstructed into LaTeX from the
+            glyphs on the page: symbols by Unicode, variables by their math fonts, exponents and
+            subscripts by their position and size.
+          </li>
+          <li>
+            <strong>Fall back where needed</strong> — a page the extractor can’t linearize
+            (heavily stacked equations, scanned pages) is handed to the Nougat neural model,
+            running on your CPU/GPU. Only those pages take the slow path.
           </li>
           <li>
             <strong>Speak-ready</strong> — an open
             <a href="https://github.com/w-witt/fuss/blob/main/pipeline/replacements.py">rule library</a>
-            turns LaTeX into plain English (so "x^2" is read "x squared"). Your feedback improves it.
+            turns LaTeX into plain English (so "x^2" is read "x squared" and "bab⁻¹" is read
+            "b a b inverse"). Your feedback improves it.
           </li>
           <li>
             <strong>Read aloud</strong> — your browser speaks the paper while highlighting each
-            word <em>on the PDF itself</em>. Click anywhere on the page to start listening from there.
+            word <em>on the PDF itself</em>. Click anywhere on the page to start listening from
+            there. Citations, footnotes, and the bibliography are kept out of your ears.
           </li>
         </ol>
         <p class="privacy">🔒 Nothing is uploaded. The conversion happens entirely on your device.</p>
