@@ -15,7 +15,7 @@
  * To open the gates for everyone: set BETA_GATE_ENABLED = false.
  */
 
-const BETA_GATE_ENABLED = true;
+const BETA_GATE_ENABLED = false;
 
 // SHA-256 (hex) of each valid code, compared against the UPPERCASED, trimmed
 // input. Generate more with:  node gen-code.mjs "FUSS-YOUR-CODE"
