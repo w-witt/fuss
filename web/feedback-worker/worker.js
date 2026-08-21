@@ -31,7 +31,16 @@ function json(obj, status = 200, extra = {}) {
   });
 }
 
-const CATEGORIES = new Set(['missed-latex', 'pronunciation', 'voice-quality', 'other']);
+const CATEGORIES = new Set([
+  'missed-latex',
+  'pronunciation',
+  'voice-quality',
+  'other',
+  // One-tap post-conversion rating from the reader; no comment required.
+  'thumbs-up',
+  'thumbs-down',
+]);
+const NO_COMMENT_OK = new Set(['thumbs-up', 'thumbs-down']);
 
 export default {
   async fetch(request, env) {
@@ -69,7 +78,20 @@ export default {
       const category = data.category;
       const comment = (data.comment || '').toString().trim();
       if (!CATEGORIES.has(category)) return json({ error: 'unknown category' }, 400);
-      if (!comment) return json({ error: 'comment required' }, 400);
+      if (!comment && !NO_COMMENT_OK.has(category)) return json({ error: 'comment required' }, 400);
+
+      // Conversion-quality lint the client computed (mmdlint.js) — numbers
+      // only, so a 👍/👎 arrives with objective context attached.
+      let lint = null;
+      if (data.lint && typeof data.lint === 'object') {
+        lint = {
+          unknown_commands: Number(data.lint.unknown_commands) || 0,
+          total_commands: Number(data.lint.total_commands) || 0,
+          bad_pages: Array.isArray(data.lint.bad_pages)
+            ? data.lint.bad_pages.slice(0, 100).map(Number).filter(Number.isFinite)
+            : [],
+        };
+      }
 
       const record = {
         timestamp: new Date().toISOString(),
@@ -77,6 +99,7 @@ export default {
         comment: comment.slice(0, 5000),
         file_name: (data.file_name || '').toString().slice(0, 200),
         segment_count: Number(data.segment_count) || 0,
+        lint,
         user_agent: (data.user_agent || '').toString().slice(0, 400),
         ip_country: request.headers.get('cf-ipcountry') || '',
       };

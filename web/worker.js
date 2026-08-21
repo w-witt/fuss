@@ -13,6 +13,7 @@
  *   { type: 'status', message }
  *   { type: 'download', file, loaded, total, progress }     // model fetch progress
  *   { type: 'ready', device }
+ *   { type: 'pageProgress', index, total, tokens, estTotal, tps }  // within a page
  *   { type: 'pageResult', index, mmd }
  *   { type: 'error', message }
  */
@@ -21,6 +22,7 @@ import {
   pipeline,
   env,
   RawImage,
+  TextStreamer,
 } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1';
 
 // Surface *which* request fails: turn an opaque "Failed to fetch" into the
@@ -134,10 +136,38 @@ async function convertPage({ index, total, width, height, buffer }) {
   // repeats mangles it badly. The cost of min_length is that a sparse page
   // pads its tail with repetition loops — dedupeRepeats/dedupeSegments in
   // latex2text.js crop those in post-processing.
+  // Stream token counts back to the UI. On single-threaded WASM a page takes
+  // many minutes, and without this the progress bar sits frozen at 0% — the
+  // exact symptom testers report as "stuck". estTotal is min_length: every
+  // page emits at least that many tokens, so it's an honest denominator.
+  const genStart = performance.now();
+  let tokenCount = 0;
+  let lastPost = 0;
+  const streamer = new TextStreamer(extractor.tokenizer, {
+    skip_prompt: true,
+    callback_function: () => {}, // default prints decoded text; we only count
+    token_callback_function: () => {
+      tokenCount += 1;
+      const now = performance.now();
+      if (now - lastPost >= 250) {
+        lastPost = now;
+        post({
+          type: 'pageProgress',
+          index,
+          total,
+          tokens: tokenCount,
+          estTotal: MIN_LENGTH,
+          tps: (tokenCount * 1000) / (now - genStart),
+        });
+      }
+    },
+  });
+
   const output = await extractor(image, {
     min_length: MIN_LENGTH,
     max_new_tokens: MAX_NEW_TOKENS,
     bad_words_ids: [[extractor.tokenizer.unk_token_id]],
+    streamer,
   });
 
   // transformers.js returns [{ generated_text }]

@@ -11,7 +11,7 @@
  *   - Otherwise open a prefilled GitHub issue on the public repo.
  */
 
-const FEEDBACK_ENDPOINT = ''; // e.g. 'https://fuss-feedback.example.workers.dev'
+const FEEDBACK_ENDPOINT = 'https://fuss-feedback.wwitt003.workers.dev';
 const GITHUB_REPO = 'https://github.com/w-witt/fuss';
 
 const CATEGORIES = [
@@ -76,6 +76,67 @@ async function submit(category, comment) {
   )}&body=${encodeURIComponent(body)}`;
   window.open(url, '_blank', 'noopener');
   return 'github';
+}
+
+// --- One-tap post-conversion rating ------------------------------------------
+// The modal below only hears from readers motivated enough to open it and
+// write; this strip captures everyone else. 👍 sends immediately; 👎 reveals an
+// optional what-was-off field. Re-injected fresh for each conversion, and each
+// record carries the lint stats from setFeedbackContext, so a bare rating still
+// arrives with objective conversion-quality context.
+export function showQuickRating() {
+  const strip = document.getElementById('rate-strip');
+  if (!strip || !FEEDBACK_ENDPOINT) return; // without a collector, one-tap has nowhere to go
+
+  strip.innerHTML = `
+    <span class="rate-q">How did this paper read?</span>
+    <button class="btn btn-ghost" id="rate-up">👍 Read well</button>
+    <button class="btn btn-ghost" id="rate-down">👎 Something was off</button>
+    <span class="rate-detail" id="rate-detail" style="display: none">
+      <input type="text" id="rate-comment" maxlength="500"
+             placeholder="What was off? (optional)" aria-label="What was off?" />
+      <button class="btn" id="rate-send">Send</button>
+    </span>`;
+  strip.style.display = 'flex';
+
+  const up = strip.querySelector('#rate-up');
+  const down = strip.querySelector('#rate-down');
+  const detail = strip.querySelector('#rate-detail');
+  const comment = strip.querySelector('#rate-comment');
+  const send = strip.querySelector('#rate-send');
+  const finish = (msg) => {
+    strip.textContent = msg;
+  };
+
+  up.addEventListener('click', async () => {
+    up.disabled = down.disabled = true;
+    try {
+      await submit('thumbs-up', '');
+      finish('👍 Thanks — glad it read well!');
+    } catch {
+      finish('Could not reach the feedback server — thanks anyway!');
+    }
+  });
+
+  down.addEventListener('click', () => {
+    down.disabled = true;
+    detail.style.display = 'inline-flex';
+    comment.focus();
+  });
+
+  const sendDown = async () => {
+    send.disabled = true;
+    try {
+      await submit('thumbs-down', comment.value.trim());
+      finish('Thanks — this is exactly what we need to fix it.');
+    } catch {
+      send.disabled = false;
+    }
+  };
+  send.addEventListener('click', sendDown);
+  comment.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendDown();
+  });
 }
 
 function injectModal() {

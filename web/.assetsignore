@@ -1,0 +1,9 @@
+
+# Worker source folders that live inside web/ but are deployed separately —
+# not part of the static site.
+feedback-worker/
+hf-proxy/
+
+# Dev-only files
+*.test.mjs
+gen-code.mjs

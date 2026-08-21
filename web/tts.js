@@ -299,7 +299,14 @@ export class AudioReader {
   }
 }
 
-/** Load available voices (getVoices is populated asynchronously). */
+/**
+ * Load available voices (getVoices is populated asynchronously).
+ *
+ * MUST NOT be called at page load — only from a user playback gesture. On
+ * Linux, Chromium and Firefox back the Web Speech API with speech-dispatcher,
+ * the same daemon screen readers (Orca) speak through, and enumerating voices
+ * while a screen reader is running can wedge it and silence the reader.
+ */
 export function loadVoices() {
   return new Promise((resolve) => {
     let voices = synth.getVoices();

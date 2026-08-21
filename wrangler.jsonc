@@ -11,5 +11,8 @@
   "assets": {
     "directory": "web"
   },
-  "workers_dev": true
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "fussreader.app", "custom_domain": true }
+  ]
 }

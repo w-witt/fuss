@@ -13,3 +13,6 @@ feedback/
 # local samples / large reference archives
 comprehensive.zip
 Sample PDF/
+
+# wrangler local state/cache
+.wrangler/

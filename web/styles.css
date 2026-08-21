@@ -491,6 +491,31 @@ footer {
   color: #ffd54f;
 }
 
+/* One-tap post-conversion rating */
+.rate-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.8rem;
+}
+.rate-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.rate-detail input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  min-width: 220px;
+}
+
 /* --- Access gate ---------------------------------------------------------- */
 body.gated {
   overflow: hidden;

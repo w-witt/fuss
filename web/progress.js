@@ -81,6 +81,21 @@ export class Progress {
     this._set(0, `Converting 0 / ${totalPages} pages…`, 'Estimating time remaining…');
   }
 
+  // Within-page token progress from the worker's streamer. A page must emit at
+  // least `estTotal` tokens (the generator's min_length), so tokens/estTotal is
+  // a real lower-bound fraction; cap it below 1 since pages can run longer.
+  pageTokens(pageNum, tokens, estTotal, tps) {
+    if (!this.total) return;
+    const pageFrac = Math.min(0.95, estTotal ? tokens / estTotal : 0);
+    const frac = (this.done + pageFrac) / this.total;
+    const rate = tps ? ` · ${tps >= 10 ? Math.round(tps) : tps.toFixed(1)} tokens/s` : '';
+    this._set(
+      frac,
+      `Converting ${this.done + 1} / ${this.total} pages…`,
+      `Page ${pageNum}: ${tokens} tokens generated${rate}`
+    );
+  }
+
   pageDone() {
     const now = performance.now();
     this.pageTimes.push(now);

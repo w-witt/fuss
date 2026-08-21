@@ -19,7 +19,7 @@ import { processMmd, segmentsToText } from './latex2text.js';
 import { extractPageMmd, resolveFontNames } from './textlayer.js';
 import { lintMmd, lintLooksBad } from './mmdlint.js';
 import { Progress } from './progress.js';
-import { initFeedback, setFeedbackContext } from './feedback.js';
+import { initFeedback, setFeedbackContext, showQuickRating } from './feedback.js';
 import { AudioReader, loadVoices, ttsSupported } from './tts.js';
 import { initAbout } from './about.js';
 import { PdfView } from './pdfview.js';
@@ -76,6 +76,9 @@ function ensureWorker() {
         break;
       case 'download':
         progress.download(msg.file, msg.loaded, msg.total);
+        break;
+      case 'pageProgress':
+        progress.pageTokens(msg.index, msg.tokens, msg.estTotal, msg.tps);
         break;
       case 'ready':
         modelReady = true;
@@ -256,6 +259,7 @@ async function showResult(text, fileName, segments, pdfDoc) {
   // Take over the whole page: the converted PDF becomes the reader.
   document.body.classList.add('reading');
   await buildReader(segments, pdfDoc);
+  showQuickRating();
   progress.hide();
 }
 
@@ -341,7 +345,7 @@ async function buildReader(segments, pdfDoc) {
         best = g;
       }
     }
-    if (best >= 0) reader.playFrom(wordSeg[best]);
+    if (best >= 0) startPlayback((r) => r.playFrom(wordSeg[best]));
   });
 
   setPlayLabel({ playing: false, paused: false, segIndex: 0, total: segments.length });
@@ -459,10 +463,14 @@ export function init() {
   });
 
   // Reader transport
-  els.playBtn.addEventListener('click', () => reader && reader.toggle());
-  els.prevBtn.addEventListener('click', () => reader && reader.prev());
-  els.nextBtn.addEventListener('click', () => reader && reader.next());
+  els.playBtn.addEventListener('click', () => startPlayback((r) => r.toggle()));
+  els.prevBtn.addEventListener('click', () => startPlayback((r) => r.prev()));
+  els.nextBtn.addEventListener('click', () => startPlayback((r) => r.next()));
   els.newBtn.addEventListener('click', resetToUpload);
+  // Enumerating voices is deferred to these gestures; do it early when someone
+  // reaches for the voice picker so the list is real by the time it opens.
+  els.voice.addEventListener('pointerdown', ensureVoices);
+  els.voice.addEventListener('focus', ensureVoices);
   els.rate.addEventListener('input', () => {
     const r = parseFloat(els.rate.value);
     els.rateVal.textContent = r.toFixed(1) + '×';
@@ -473,13 +481,33 @@ export function init() {
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && reader && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) {
       e.preventDefault();
-      reader.toggle();
+      startPlayback((r) => r.toggle());
     }
   });
 
-  populateVoices();
+  // Deliberately NO populateVoices() here: touching speechSynthesis at page
+  // load is what broke Orca for a Linux tester (see ensureVoices).
   initFeedback();
   initAbout();
+}
+
+// Voices are enumerated only on the first playback gesture, never at page
+// load. On Linux the browser's Web Speech implementation talks to
+// speech-dispatcher — the same daemon Orca speaks through — and a load-time
+// getVoices() can wedge it, silencing a running screen reader the moment the
+// page opens.
+let voicesReady = null;
+function ensureVoices() {
+  if (!voicesReady) voicesReady = populateVoices();
+  return voicesReady;
+}
+
+async function startPlayback(action) {
+  if (!reader) return;
+  await ensureVoices();
+  if (!reader || els.playBtn.disabled) return;
+  if (selectedVoice && !reader.voice) reader.setVoice(selectedVoice);
+  action(reader);
 }
 
 async function populateVoices() {
